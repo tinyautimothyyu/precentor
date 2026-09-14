@@ -14,7 +14,7 @@ build plan.
 | Backend | Django 5 + DRF + SimpleJWT | Django admin for super-admins; JWT API for leaders/volunteers |
 | Database | PostgreSQL 16 | Relational core + JSONB for lyric segments / alignment |
 | File storage | Local FS (dev) / S3-compatible (prod) | Env-switched via `USE_S3` |
-| Frontend | Next.js 15 (App Router) | Browse/detail + JWT login, leader upload/edit, gated downloads |
+| Frontend | Next.js 15 (App Router, **TypeScript**) | Browse/detail + JWT login, leader upload/edit, gated downloads, services/playlist |
 
 ### Roles & access
 
@@ -79,6 +79,11 @@ npm run dev                        # http://localhost:3000
 | `GET /api/songs/{id}/` | public | Full detail: lyrics, sheets, alignments |
 | `POST/PATCH/DELETE /api/songs/`,`/lyrics/`,`/sheets/`,`/alignments/` | leader | Team-scoped writes |
 | `GET /api/sheets/{id}/download/` | approved | Auth-gated file download (all songs) |
+| `GET /api/services/` · `/{id}/` | approved | Worship services ("albums") + ordered playlist |
+| `POST/PATCH/DELETE /api/services/` · `/service-songs/` | leader | Team-scoped service management |
+| `POST /api/services/{id}/reorder/` | leader | Reorder the set list (`{item_ids:[…]}`) |
+| `GET /api/youtube/search/?q=` | approved | Optional YouTube search (needs `YOUTUBE_API_KEY`) |
+| `GET /api/config/` | public | Feature flags (e.g. `youtube_search`) |
 | `GET /api/tags/` · `/api/congregations/` | public | Tag vocabulary / congregations + teams |
 
 ## Build status vs. plan
@@ -91,4 +96,11 @@ npm run dev                        # http://localhost:3000
 | 4 — DRF API | ✅ Read + team-scoped write endpoints, filtered search |
 | 5 — Next.js frontend | ✅ Browse, filter, detail + JWT login/signup, leader upload/edit, gated download |
 | — Auth & roles | ✅ JWT, admin/leader/volunteer, team-scoped ownership, self-signup + approval |
+| — Services & playlist | ✅ Service/ServiceSong, in-order YouTube/Spotify playlist, "Play all on YouTube", optional YouTube search |
+| — Frontend TypeScript | ✅ Whole SPA converted to TS (strict) with typed API client |
 | 6 — Instrumentation | ⬜ Not yet started |
+
+### Optional: YouTube search
+Set `YOUTUBE_API_KEY` (YouTube Data API v3) in `backend/.env` to enable in-app
+YouTube search when adding a reference track. Without it, `/api/config/` reports
+`youtube_search:false`, the search box hides, and pasting a link still works.

@@ -1,7 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { use, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
   createLyrics,
@@ -9,34 +8,59 @@ import {
   fetchSong,
   updateSong,
   uploadSheet,
+  type ApiError,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import type { SongDetail } from "@/lib/types";
+import YouTubePicker from "@/app/components/YouTubePicker";
 
-const SHEET_TYPES = [
+const SHEET_TYPES: [string, string][] = [
   ["chord_chart", "Chord chart"],
   ["lead_sheet", "Lead sheet"],
   ["piano_score", "Piano score"],
   ["hymnal", "Hymnal"],
   ["vocal_only", "Vocal only"],
 ];
-const SOURCES = [
+const SOURCES: [string, string][] = [
   ["purchased", "Purchased"],
   ["transcribed", "Transcribed"],
   ["arranged", "Arranged"],
 ];
 
-export default function EditSongPage({ params }) {
+interface MetaState {
+  title: string;
+  ccli_number: string;
+  copyright_holder: string;
+  default_key: string;
+  tempo: string;
+  reference_url: string;
+}
+
+interface SheetState {
+  type: string;
+  key: string;
+  source: string;
+  file: File | null;
+}
+
+export default function EditSongPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
   const { user, isLeader, ownsTeam, loading } = useAuth();
-  const router = useRouter();
-  const [song, setSong] = useState(null);
-  const [meta, setMeta] = useState(null);
-  const [msg, setMsg] = useState(null);
-  const [err, setErr] = useState(null);
+  const [song, setSong] = useState<SongDetail | null>(null);
+  const [meta, setMeta] = useState<MetaState | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
-  // sheet upload form
-  const [sheet, setSheet] = useState({ type: "chord_chart", key: "", source: "transcribed", file: null });
-  // lyric form
+  const [sheet, setSheet] = useState<SheetState>({
+    type: "chord_chart",
+    key: "",
+    source: "transcribed",
+    file: null,
+  });
   const [lyric, setLyric] = useState({ language: "", text: "" });
 
   const reload = () => fetchSong(id).then(setSong);
@@ -49,16 +73,20 @@ export default function EditSongPage({ params }) {
           title: s.title,
           ccli_number: s.ccli_number,
           copyright_holder: s.copyright_holder,
-          licensing_notes: s.licensing_notes || "",
           default_key: s.default_key || "",
-          tempo: s.tempo || "",
+          tempo: s.tempo ? String(s.tempo) : "",
+          reference_url: s.reference_url || "",
         });
       })
       .catch(() => setErr("Song not found."));
   }, [id]);
 
-  if (loading || !song) {
-    return <main className="container"><p className="muted">Loading…</p></main>;
+  if (loading || !song || !meta) {
+    return (
+      <main className="container">
+        <p className="muted">Loading…</p>
+      </main>
+    );
   }
 
   const ownsSong = ownsTeam(song.owner_team);
@@ -77,24 +105,36 @@ export default function EditSongPage({ params }) {
     );
   }
 
-  async function saveMeta(e) {
+  function reportError(e: unknown) {
+    const e2 = e as ApiError;
+    setErr(e2.data ? JSON.stringify(e2.data) : e2.message);
+  }
+
+  async function saveMeta(e: FormEvent) {
     e.preventDefault();
-    setErr(null); setMsg(null);
+    setErr(null);
+    setMsg(null);
+    if (!meta) return;
     try {
-      const payload = { ...meta };
-      payload.tempo = meta.tempo ? Number(meta.tempo) : null;
-      await updateSong(id, payload);
+      await updateSong(id, {
+        ...meta,
+        tempo: meta.tempo ? Number(meta.tempo) : null,
+      });
       setMsg("Song details saved.");
       reload();
     } catch (e2) {
-      setErr(e2.data ? JSON.stringify(e2.data) : e2.message);
+      reportError(e2);
     }
   }
 
-  async function addSheet(e) {
+  async function addSheet(e: FormEvent) {
     e.preventDefault();
-    setErr(null); setMsg(null);
-    if (!sheet.file) { setErr("Choose a file."); return; }
+    setErr(null);
+    setMsg(null);
+    if (!sheet.file) {
+      setErr("Choose a file.");
+      return;
+    }
     try {
       const fd = new FormData();
       fd.append("song", id);
@@ -104,28 +144,30 @@ export default function EditSongPage({ params }) {
       fd.append("file", sheet.file);
       await uploadSheet(fd);
       setSheet({ type: "chord_chart", key: "", source: "transcribed", file: null });
-      e.target.reset();
+      (e.target as HTMLFormElement).reset();
       setMsg("Sheet uploaded.");
       reload();
     } catch (e2) {
-      setErr(e2.data ? JSON.stringify(e2.data) : e2.message);
+      reportError(e2);
     }
   }
 
-  async function removeSheet(sid) {
-    setErr(null); setMsg(null);
+  async function removeSheet(sid: number) {
+    setErr(null);
+    setMsg(null);
     try {
       await deleteSheet(sid);
       setMsg("Sheet removed.");
       reload();
     } catch (e2) {
-      setErr(e2.message);
+      reportError(e2);
     }
   }
 
-  async function addLyric(e) {
+  async function addLyric(e: FormEvent) {
     e.preventDefault();
-    setErr(null); setMsg(null);
+    setErr(null);
+    setMsg(null);
     try {
       const segments = [
         {
@@ -138,7 +180,7 @@ export default function EditSongPage({ params }) {
       setMsg("Lyrics added.");
       reload();
     } catch (e2) {
-      setErr(e2.data ? JSON.stringify(e2.data) : e2.message);
+      reportError(e2);
     }
   }
 
@@ -170,6 +212,14 @@ export default function EditSongPage({ params }) {
                 <input type="number" value={meta.tempo} onChange={(e) => setMeta({ ...meta, tempo: e.target.value })} />
               </label>
             </div>
+            <label>Reference URL <span className="muted">(YouTube/Spotify/any link)</span>
+              <input
+                value={meta.reference_url}
+                onChange={(e) => setMeta({ ...meta, reference_url: e.target.value })}
+                placeholder="https://…"
+              />
+            </label>
+            <YouTubePicker onPick={(url) => setMeta({ ...meta, reference_url: url })} />
             <button type="submit">Save details</button>
           </form>
         </div>
@@ -221,7 +271,11 @@ export default function EditSongPage({ params }) {
             </label>
           </div>
           <label>File
-            <input type="file" onChange={(e) => setSheet({ ...sheet, file: e.target.files[0] })} required />
+            <input
+              type="file"
+              onChange={(e) => setSheet({ ...sheet, file: e.target.files?.[0] ?? null })}
+              required
+            />
           </label>
           <button type="submit">Upload sheet</button>
         </form>

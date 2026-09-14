@@ -142,6 +142,80 @@ form button[type="submit"]:disabled { opacity: 0.6; cursor: default; }
 }
 .chip.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 
+/* --- services & playlist --- */
+.service-list { display: flex; flex-direction: column; gap: 10px; }
+.service-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.service-title { font-weight: 600; font-size: 16px; }
+.nowplaying { margin-bottom: 10px; font-size: 16px; }
+.embed {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+}
+.embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.embed-spotify { aspect-ratio: auto; height: 152px; background: transparent; }
+.embed-spotify iframe { position: static; height: 152px; }
+.player-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.setlist { margin: 0; padding-left: 20px; }
+.setlist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.setlist li.on { font-weight: 600; }
+.setlist-title { background: none; border: 0; color: var(--text); font: inherit; cursor: pointer; text-align: left; padding: 0; }
+.setlist-title:hover { color: var(--accent); }
+.setlist-actions { display: flex; gap: 10px; flex-shrink: 0; }
+.add-results { list-style: none; margin: 10px 0 0; padding: 0; }
+.add-results li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.linkbtn.danger { color: #a12622; }
+
+/* --- youtube picker --- */
+.yt-picker { margin-bottom: 14px; }
+.yt-search-row { display: flex; gap: 8px; align-items: center; }
+.yt-search-row input { flex: 1; }
+.yt-results { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.yt-results button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  cursor: pointer;
+}
+.yt-results button:hover { border-color: var(--accent); }
+.yt-results img { border-radius: 4px; flex-shrink: 0; }
+.yt-meta { display: flex; flex-direction: column; }
+.yt-title { font-size: 13px; font-weight: 600; }
+.yt-channel { font-size: 12px; color: var(--muted); }
+
 .controls {
   display: flex;
   flex-wrap: wrap;

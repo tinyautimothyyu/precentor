@@ -141,6 +141,10 @@ class Song(TimeStampedModel):
     tempo = models.PositiveIntegerField(
         null=True, blank=True, help_text="Beats per minute."
     )
+    reference_url = models.URLField(
+        blank=True,
+        help_text="Reference recording (YouTube/Spotify/any link) for listening.",
+    )
 
     tags = models.ManyToManyField(Tag, blank=True, related_name="songs")
 
@@ -301,3 +305,66 @@ class SheetFile(TimeStampedModel):
 
     def __str__(self):
         return f"{self.song.title} — {self.get_type_display()} ({self.key or 'n/a'})"
+
+
+# --- Services (a planned worship set — the "album" / playlist) ------------
+
+
+class Service(TimeStampedModel):
+    """
+    A planned worship service owned by a team. Its ordered songs (ServiceSong)
+    double as a listening playlist. Any approved account can view; only the
+    owning team's leaders can edit.
+    """
+
+    team = models.ForeignKey(
+        Team, on_delete=models.CASCADE, related_name="services"
+    )
+    congregation = models.ForeignKey(
+        Congregation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="services",
+    )
+    date = models.DateField()
+    title = models.CharField(
+        max_length=200, blank=True, help_text="Occasion or theme (optional)."
+    )
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="services_created",
+    )
+
+    class Meta:
+        ordering = ["-date"]
+
+    def __str__(self):
+        label = self.title or "Service"
+        return f"{label} — {self.date} ({self.team.name})"
+
+
+class ServiceSong(models.Model):
+    """A song's place in a service's flow. Duplicates allowed (e.g. a reprise)."""
+
+    service = models.ForeignKey(
+        Service, on_delete=models.CASCADE, related_name="items"
+    )
+    song = models.ForeignKey(
+        Song, on_delete=models.CASCADE, related_name="service_appearances"
+    )
+    order = models.PositiveIntegerField(default=0)
+    key_override = models.CharField(max_length=10, blank=True)
+    format_override = models.CharField(
+        max_length=20, choices=SheetType.choices, blank=True
+    )
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"{self.service} · {self.order}. {self.song.title}"

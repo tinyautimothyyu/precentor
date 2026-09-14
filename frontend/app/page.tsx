@@ -3,29 +3,30 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchSongs, fetchTags } from "@/lib/api";
+import type { SongListItem, Tag } from "@/lib/types";
 
 export default function LibraryPage() {
-  const [songs, setSongs] = useState([]);
-  const [tags, setTags] = useState([]);
+  const [songs, setSongs] = useState<SongListItem[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [search, setSearch] = useState("");
   const [language, setLanguage] = useState("");
   const [tag, setTag] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load the tag vocabulary once for the filter dropdown.
   useEffect(() => {
-    fetchTags().then((d) => setTags(d.results || [])).catch(() => {});
+    fetchTags()
+      .then((d) => setTags(d.results))
+      .catch(() => {});
   }, []);
 
-  // Re-query whenever a filter changes (debounced for the search box).
   useEffect(() => {
     const handle = setTimeout(() => {
       setLoading(true);
       setError(null);
       fetchSongs({ search, language, tag })
-        .then((d) => setSongs(d.results || []))
-        .catch((e) => setError(e.message))
+        .then((d) => setSongs(d.results))
+        .catch((e: Error) => setError(e.message))
         .finally(() => setLoading(false));
     }, 200);
     return () => clearTimeout(handle);

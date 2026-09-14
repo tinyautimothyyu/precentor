@@ -9,6 +9,8 @@ from django.utils.html import format_html
 from .models import (
     Congregation,
     LyricAlignment,
+    Service,
+    ServiceSong,
     SheetFile,
     Song,
     SongLyrics,
@@ -59,7 +61,18 @@ class SongAdmin(admin.ModelAdmin):
     readonly_fields = ("created_by", "created_at", "updated_at")
 
     fieldsets = (
-        (None, {"fields": ("title", "alternate_titles", "default_key", "tempo")}),
+        (
+            None,
+            {
+                "fields": (
+                    "title",
+                    "alternate_titles",
+                    "default_key",
+                    "tempo",
+                    "reference_url",
+                )
+            },
+        ),
         (
             "Licensing (required)",
             {
@@ -176,3 +189,24 @@ class SheetFileAdmin(admin.ModelAdmin):
         if obj.file:
             return format_html('<a href="{}" target="_blank">open</a>', obj.file.url)
         return "—"
+
+
+class ServiceSongInline(admin.TabularInline):
+    model = ServiceSong
+    extra = 0
+    fields = ("order", "song", "key_override", "format_override")
+    autocomplete_fields = ("song",)
+    ordering = ("order",)
+
+
+@admin.register(Service)
+class ServiceAdmin(admin.ModelAdmin):
+    list_display = ("date", "title", "team", "song_count")
+    list_filter = ("team", "congregation", "date")
+    search_fields = ("title", "team__name")
+    autocomplete_fields = ("team", "congregation")
+    inlines = [ServiceSongInline]
+
+    @admin.display(description="Songs")
+    def song_count(self, obj):
+        return obj.items.count()

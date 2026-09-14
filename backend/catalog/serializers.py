@@ -3,6 +3,8 @@ from rest_framework import serializers
 from .models import (
     Congregation,
     LyricAlignment,
+    Service,
+    ServiceSong,
     SheetFile,
     Song,
     SongLyrics,
@@ -132,6 +134,7 @@ class SongDetailSerializer(SongListSerializer):
         fields = SongListSerializer.Meta.fields + [
             "copyright_holder",
             "licensing_notes",
+            "reference_url",
             "lyrics",
             "sheets",
             "alignments",
@@ -158,6 +161,7 @@ class SongWriteSerializer(serializers.ModelSerializer):
             "licensing_notes",
             "default_key",
             "tempo",
+            "reference_url",
             "tags",
             "owner_team",
         ]
@@ -202,3 +206,60 @@ class CongregationSerializer(serializers.ModelSerializer):
             "song_restrictions",
             "teams",
         ]
+
+
+# --- Services -------------------------------------------------------------
+
+
+class ServiceSongSongSerializer(serializers.ModelSerializer):
+    """Light song block embedded in a service item (for the playlist)."""
+
+    class Meta:
+        model = Song
+        fields = ["id", "title", "default_key", "reference_url"]
+
+
+class ServiceSongSerializer(serializers.ModelSerializer):
+    song_detail = ServiceSongSongSerializer(source="song", read_only=True)
+
+    class Meta:
+        model = ServiceSong
+        fields = [
+            "id",
+            "service",
+            "song",
+            "song_detail",
+            "order",
+            "key_override",
+            "format_override",
+        ]
+        read_only_fields = ["order"]
+
+
+class ServiceListSerializer(serializers.ModelSerializer):
+    team_name = serializers.CharField(source="team.name", read_only=True)
+    item_count = serializers.IntegerField(source="items.count", read_only=True)
+
+    class Meta:
+        model = Service
+        fields = ["id", "team", "team_name", "date", "title", "item_count"]
+
+
+class ServiceDetailSerializer(ServiceListSerializer):
+    items = ServiceSongSerializer(many=True, read_only=True)
+
+    class Meta(ServiceListSerializer.Meta):
+        fields = ServiceListSerializer.Meta.fields + [
+            "congregation",
+            "notes",
+            "items",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class ServiceWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Service
+        fields = ["id", "date", "title", "notes", "congregation", "team"]
+        read_only_fields = ["team"]

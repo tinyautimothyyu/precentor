@@ -4,13 +4,18 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchSong, downloadSheet } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import type { SheetFile, SongDetail } from "@/lib/types";
 
-export default function SongDetail({ params }) {
+export default function SongDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
-  const { user, isApproved, isLeader, ownsTeam } = useAuth();
-  const [song, setSong] = useState(null);
-  const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
+  const { isApproved, isLeader, ownsTeam } = useAuth();
+  const [song, setSong] = useState<SongDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSong(id)
@@ -18,12 +23,12 @@ export default function SongDetail({ params }) {
       .catch(() => setError("Song not found."));
   }, [id]);
 
-  async function onDownload(sheet) {
+  async function onDownload(sheet: SheetFile) {
     setNotice(null);
     try {
-      await downloadSheet(sheet.id, `${song.title} - ${sheet.type}.pdf`);
+      await downloadSheet(sheet.id, `${song?.title} - ${sheet.type}.pdf`);
     } catch (err) {
-      setNotice(err.message);
+      setNotice(err instanceof Error ? err.message : "Download failed.");
     }
   }
 
@@ -57,7 +62,7 @@ export default function SongDetail({ params }) {
           </Link>
         )}
       </div>
-      {song.alternate_titles?.length > 0 && (
+      {song.alternate_titles.length > 0 && (
         <p className="muted">Also: {song.alternate_titles.join(", ")}</p>
       )}
       <p className="muted">
@@ -72,8 +77,19 @@ export default function SongDetail({ params }) {
           </span>
         ))}
       </div>
+      {song.reference_url && (
+        <p style={{ marginTop: 12 }}>
+          <a href={song.reference_url} target="_blank" rel="noreferrer">
+            Listen ↗
+          </a>
+        </p>
+      )}
 
-      {notice && <div className="msg error" style={{ marginTop: 16 }}>{notice}</div>}
+      {notice && (
+        <div className="msg error" style={{ marginTop: 16 }}>
+          {notice}
+        </div>
+      )}
 
       <section className="section">
         <h4>Sheet music</h4>
@@ -119,10 +135,10 @@ export default function SongDetail({ params }) {
                 {ly.language}
                 <span className="status">{ly.status_display}</span>
               </div>
-              {(ly.segments || []).map((seg, i) => (
+              {ly.segments.map((seg, i) => (
                 <div key={i} className="segment">
                   <div className="seg-type">{seg.segment_type}</div>
-                  <div className="lines">{(seg.lines || []).join("\n")}</div>
+                  <div className="lines">{seg.lines.join("\n")}</div>
                 </div>
               ))}
             </div>
@@ -130,7 +146,7 @@ export default function SongDetail({ params }) {
         )}
       </section>
 
-      {song.alignments?.length > 0 && (
+      {song.alignments.length > 0 && (
         <section className="section">
           <h4>Bilingual alignment</h4>
           {song.alignments.map((a) => (
