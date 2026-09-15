@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 
 export default function Header() {
-  const { user, loading, logout, isLeader } = useAuth();
+  const { user, loading, logout, isLeader, isApproved } = useAuth();
 
   return (
     <header className="site">
@@ -16,6 +16,11 @@ export default function Header() {
         <nav className="header-nav">
           {loading ? null : user ? (
             <>
+              {isApproved && (
+                <Link href="/services" className="header-link">
+                  Services
+                </Link>
+              )}
               {isLeader && (
                 <Link href="/songs/new" className="header-link">
                   ＋ New song

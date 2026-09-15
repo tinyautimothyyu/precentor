@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
-import { fetchCongregations } from "@/lib/api";
+import { fetchCongregations, type ApiError } from "@/lib/api";
+import type { Congregation } from "@/lib/types";
+
+interface FormState {
+  username: string;
+  email: string;
+  password: string;
+  role: string;
+  congregation: string;
+  team: string;
+}
 
 export default function SignupPage() {
   const { register } = useAuth();
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     username: "",
     email: "",
     password: "",
@@ -15,39 +25,42 @@ export default function SignupPage() {
     congregation: "",
     team: "",
   });
-  const [congregations, setCongregations] = useState([]);
-  const [error, setError] = useState(null);
+  const [congregations, setCongregations] = useState<Congregation[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    fetchCongregations().then((d) => setCongregations(d.results || [])).catch(() => {});
+    fetchCongregations()
+      .then((d) => setCongregations(d.results))
+      .catch(() => {});
   }, []);
 
   const teams =
-    congregations.find((c) => String(c.id) === String(form.congregation))?.teams || [];
+    congregations.find((c) => String(c.id) === String(form.congregation))?.teams ||
+    [];
 
-  function set(k, v) {
+  function set(k: keyof FormState, v: string) {
     setForm((f) => ({ ...f, [k]: v, ...(k === "congregation" ? { team: "" } : {}) }));
   }
 
-  async function onSubmit(e) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      const payload = {
+      await register({
         username: form.username,
         email: form.email,
         password: form.password,
         role: form.role,
-      };
-      if (form.congregation) payload.congregation = Number(form.congregation);
-      if (form.team) payload.team = Number(form.team);
-      await register(payload);
+        ...(form.congregation ? { congregation: Number(form.congregation) } : {}),
+        ...(form.team ? { team: Number(form.team) } : {}),
+      });
       setDone(true);
     } catch (err) {
-      setError(err.data ? JSON.stringify(err.data) : err.message);
+      const e2 = err as ApiError;
+      setError(e2.data ? JSON.stringify(e2.data) : e2.message);
     } finally {
       setBusy(false);
     }

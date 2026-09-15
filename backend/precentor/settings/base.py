@@ -178,3 +178,9 @@ CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:3000", "http://127.0.0.1:3000"],
 )
+
+# --- Integrations --------------------------------------------------------
+
+# Optional. When set, enables in-app YouTube search for reference tracks.
+# The key stays server-side; the browser never sees it.
+YOUTUBE_API_KEY = env("YOUTUBE_API_KEY", default="")
