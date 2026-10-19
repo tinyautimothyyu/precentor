@@ -7,6 +7,7 @@ from .views import (
     ServiceSongViewSet,
     ServiceViewSet,
     SheetFileViewSet,
+    SongLookupView,
     SongLyricsViewSet,
     SongViewSet,
     TagViewSet,
@@ -27,5 +28,7 @@ router.register("service-songs", ServiceSongViewSet, basename="servicesong")
 urlpatterns = [
     path("config/", config_view, name="config"),
     path("youtube/search/", YouTubeSearchView.as_view(), name="youtube_search"),
+    # Before the router so "lookup" isn't read as a song id.
+    path("songs/lookup/", SongLookupView.as_view(), name="song_lookup"),
     *router.urls,
 ]

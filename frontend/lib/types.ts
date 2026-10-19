@@ -174,6 +174,24 @@ export interface YouTubeResult {
   thumbnail: string;
 }
 
+export interface SongLookupField {
+  value: string;
+  /** "youtube" | "spotify" */
+  source: string;
+}
+
+/** Result of POST /api/songs/lookup/ — suggestions to review, never authoritative. */
+export interface SongLookup {
+  provider: "youtube" | "spotify";
+  fields: Partial<
+    Record<"title" | "ccli_number" | "copyright_holder" | "reference_url", SongLookupField>
+  >;
+  artist: string;
+  songwriters: string[];
+  warnings: string[];
+  duplicates: { id: number; title: string; reason: string }[];
+}
+
 export interface AppConfig {
   youtube_search: boolean;
 }

@@ -30,8 +30,8 @@ The build is organized into self-contained chunks. Each chunk produces a coheren
 | 6 | Instrumentation | ⬜ Not started |
 | 7 | Song profile quick wins | 🔀 On branch `feature/song-profile-quick-wins` |
 | 8 | Custom tags | 🔀 On branch `feature/custom-tags` |
-| 9 | Link-first "Add song" with autofill | ⬜ Next up |
-| 10 | Sheet reuse | ⬜ Planned |
+| 9 | Link-first "Add song" with autofill | 🔀 On branch `feature/link-first-add-song` |
+| 10 | Sheet reuse | ⬜ Next up |
 | 11 | Structured lyrics & team flows | ⬜ Planned |
 
 Rough total for chunks 7–11: **3–5 weeks** for one developer.
@@ -171,6 +171,8 @@ Plus a **"Search SongSelect"** link beside the CCLI field, pre-filled with the t
 - Claude-based extraction of credits from video descriptions, if regex proves too brittle (adds a paid external call per lookup).
 
 **Done when:** pasting a typical official worship video link fills title (and usually artist) correctly, and a song can still be created entirely by hand.
+
+**As built:** without `YOUTUBE_API_KEY`, YouTube falls back to keyless oEmbed (title + channel only, so no CCLI/© extraction) — set the key in production to get description-based licensing suggestions. Duplicate detection also flags existing songs that already use the same video.
 
 ---
 
