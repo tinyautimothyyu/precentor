@@ -29,8 +29,8 @@ The build is organized into self-contained chunks. Each chunk produces a coheren
 | — | Fix: sheet downloads saved with wrong file type | ✅ Done (PR #4) |
 | 6 | Instrumentation | ⬜ Not started |
 | 7 | Song profile quick wins | 🔀 On branch `feature/song-profile-quick-wins` |
-| 8 | Custom tags | ⬜ Next up |
-| 9 | Link-first "Add song" with autofill | ⬜ Planned |
+| 8 | Custom tags | 🔀 On branch `feature/custom-tags` |
+| 9 | Link-first "Add song" with autofill | ⬜ Next up |
 | 10 | Sheet reuse | ⬜ Planned |
 | 11 | Structured lyrics & team flows | ⬜ Planned |
 
@@ -138,6 +138,7 @@ Plus a **"Search SongSelect"** link beside the CCLI field, pre-filled with the t
 - Tag text box with type-ahead over existing tags (existing tags always offered first); "Create tag '…'" when nothing matches.
 - New tags: category `custom`, `created_by_team`; case-insensitive uniqueness, trimmed whitespace.
 - Admin actions: merge duplicate tags; move a custom tag into a proper category.
+- Also fixes: the tag list was paginated at 25 (pickers would silently miss tags), and tags couldn't be edited after a song was created — the edit page now has the same tag input.
 
 **Done when:** a leader can add a tag that doesn't exist yet without creating near-duplicates of existing ones.
 

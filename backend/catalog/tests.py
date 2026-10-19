@@ -9,7 +9,7 @@ from rest_framework.test import APITestCase
 
 from accounts.models import Membership
 
-from .models import Congregation, Service, ServiceSong, SheetFile, Song, Team
+from .models import Congregation, Service, ServiceSong, SheetFile, Song, Tag, Team
 
 User = get_user_model()
 
@@ -203,3 +203,77 @@ class SongProfileApiTests(APITestCase):
         res = self.client.get(f"/api/sheets/{second.id}/download/")
         self.assertEqual(res.status_code, 200)
         self.assertIn('filename="My Chart.pdf"', res["Content-Disposition"])
+
+
+class CustomTagApiTests(APITestCase):
+    def setUp(self):
+        cong = Congregation.objects.create(name="Main", primary_language="en")
+        self.team = Team.objects.create(name="Team A", congregation=cong)
+        self.leader = self._user("leaderA", Membership.Role.LEADER)
+        self.vol = self._user("vol", Membership.Role.VOLUNTEER)
+        self.advent = Tag.objects.create(category=Tag.Category.SEASON, name="Advent")
+
+    def _user(self, username, role):
+        user = User.objects.create_user(username=username, password="pw")
+        Membership.objects.filter(user=user).update(
+            team=self.team, role=role, is_approved=True
+        )
+        return User.objects.get(pk=user.pk)
+
+    def _create(self, name, user=None):
+        self.client.force_authenticate(user or self.leader)
+        return self.client.post("/api/tags/", {"name": name}, format="json")
+
+    def test_leader_creates_custom_tag(self):
+        res = self._create("Communion")
+        self.assertEqual(res.status_code, 201)
+        tag = Tag.objects.get(pk=res.json()["id"])
+        self.assertEqual(tag.category, Tag.Category.CUSTOM)
+        self.assertEqual(tag.created_by_team, self.team)
+
+    def test_whitespace_is_normalised(self):
+        res = self._create("  Good   Friday ")
+        self.assertEqual(res.json()["name"], "Good Friday")
+
+    def test_existing_name_any_case_returns_existing_tag(self):
+        res = self._create("advent")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["id"], self.advent.id)
+        self.assertEqual(Tag.objects.count(), 1)
+
+    def test_custom_duplicate_returns_existing_custom(self):
+        first = self._create("Communion").json()["id"]
+        res = self._create("COMMUNION")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["id"], first)
+
+    def test_blank_name_rejected(self):
+        self.assertEqual(self._create("   ").status_code, 400)
+
+    def test_volunteer_and_anonymous_cannot_create(self):
+        self.assertEqual(self._create("X", user=self.vol).status_code, 403)
+        self.client.force_authenticate(None)
+        res = self.client.post("/api/tags/", {"name": "X"}, format="json")
+        self.assertIn(res.status_code, (401, 403))
+
+    def test_tags_are_not_paginated_at_25(self):
+        Tag.objects.bulk_create(
+            Tag(category=Tag.Category.CUSTOM, name=f"t{i}") for i in range(40)
+        )
+        data = self.client.get("/api/tags/").json()
+        self.assertEqual(len(data["results"]), 41)
+        self.assertIsNone(data["next"])
+
+    def test_admin_merge_keeps_curated_tag_and_moves_songs(self):
+        song = Song.objects.create(title="S", copyright_holder="H")
+        custom = Tag.objects.create(category=Tag.Category.CUSTOM, name="advent season")
+        song.tags.add(custom)
+        staff = User.objects.create_superuser("admin", "a@x.test", "pw")
+        self.client.force_login(staff)
+        res = self.client.post(
+            "/admin/catalog/tag/",
+            {"action": "merge_tags", "_selected_action": [self.advent.id, custom.id]},
+        )
+        self.assertEqual(res.status_code, 302)
+        self.assertFalse(Tag.objects.filter(pk=custom.pk).exists())
+        self.assertEqual(list(song.tags.all()), [self.advent])

@@ -3,11 +3,13 @@ import urllib.parse
 import urllib.request
 
 from django.conf import settings
-from django.db.models import Prefetch
+from django.db import IntegrityError, transaction
+from django.db.models import Case, Prefetch, When
 from django.http import FileResponse, Http404
-from rest_framework import permissions, status, viewsets
+from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -40,6 +42,7 @@ from .serializers import (
     SongLyricsSerializer,
     SongListSerializer,
     SongWriteSerializer,
+    TagCreateSerializer,
     TagSerializer,
 )
 
@@ -147,12 +150,65 @@ class LyricAlignmentViewSet(OwnedModelViewSet):
     filterset_fields = ["song"]
 
 
-class TagViewSet(viewsets.ReadOnlyModelViewSet):
+class AllTagsPagination(PageNumberPagination):
+    # Pickers and filters need the whole vocabulary in one response.
+    page_size = 1000
+
+
+class TagViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
+    """
+    Reads are public. Approved leaders can add custom tags; a name that
+    already exists in any category (case-insensitive) returns that tag (200)
+    instead of creating a near-duplicate.
+    """
+
     queryset = Tag.objects.all()
-    serializer_class = TagSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [IsLeaderOwnerOrReadOnly]
+    pagination_class = AllTagsPagination
     filterset_fields = ["category"]
     search_fields = ["name"]
+
+    def get_serializer_class(self):
+        return TagCreateSerializer if self.action == "create" else TagSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = TagCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        name = serializer.validated_data["name"]
+
+        def existing():
+            # Prefer a curated tag over a custom one with the same name.
+            return (
+                Tag.objects.filter(name__iexact=name)
+                .order_by(
+                    Case(When(category=Tag.Category.CUSTOM, then=1), default=0),
+                    "id",
+                )
+                .first()
+            )
+
+        tag = existing()
+        created = False
+        if tag is None:
+            try:
+                with transaction.atomic():
+                    tag = Tag.objects.create(
+                        name=name,
+                        category=Tag.Category.CUSTOM,
+                        created_by_team=_team_of(request.user),
+                    )
+                created = True
+            except IntegrityError:  # created concurrently
+                tag = existing()
+        return Response(
+            TagSerializer(tag).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 class CongregationViewSet(viewsets.ReadOnlyModelViewSet):
