@@ -11,16 +11,9 @@ import {
   type ApiError,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { SongDetail } from "@/lib/types";
+import { SHEET_TYPES, type SongDetail } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
 
-const SHEET_TYPES: [string, string][] = [
-  ["chord_chart", "Chord chart"],
-  ["lead_sheet", "Lead sheet"],
-  ["piano_score", "Piano score"],
-  ["hymnal", "Hymnal"],
-  ["vocal_only", "Vocal only"],
-];
 const SOURCES: [string, string][] = [
   ["purchased", "Purchased"],
   ["transcribed", "Transcribed"],

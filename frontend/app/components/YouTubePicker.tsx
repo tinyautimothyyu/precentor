@@ -12,11 +12,14 @@ import type { YouTubeResult } from "@/lib/types";
  */
 export default function YouTubePicker({
   onPick,
+  initialQuery = "",
 }: {
   onPick: (url: string) => void;
+  /** Prefills the search box (e.g. with the song title). */
+  initialQuery?: string;
 }) {
   const [enabled, setEnabled] = useState(false);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery);
   const [results, setResults] = useState<YouTubeResult[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
