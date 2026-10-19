@@ -7,6 +7,15 @@ export interface Paginated<T> {
   results: T[];
 }
 
+/** Mirrors catalog.models.SheetType. */
+export const SHEET_TYPES: [string, string][] = [
+  ["chord_chart", "Chord chart"],
+  ["lead_sheet", "Lead sheet"],
+  ["piano_score", "Piano score"],
+  ["hymnal", "Hymnal"],
+  ["vocal_only", "Vocal only"],
+];
+
 export interface Tag {
   id: number;
   name: string;
@@ -112,10 +121,24 @@ export interface ServiceSongItem {
     title: string;
     default_key: string;
     reference_url: string;
+    owner_team: number | null;
+    sheets: ServiceSheet[];
   };
   order: number;
   key_override: string;
   format_override: string;
+  /** Track for this service only ("" = use the song's). */
+  reference_url_override: string;
+  /** Effective track: the override, else the song's reference_url. */
+  reference_url: string;
+}
+
+export interface ServiceSheet {
+  id: number;
+  type: string;
+  type_display: string;
+  key: string;
+  has_file: boolean;
 }
 
 export interface ServiceListItem {

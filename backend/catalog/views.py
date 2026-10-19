@@ -163,7 +163,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return (
             Service.objects.select_related("team", "congregation")
-            .prefetch_related("items__song")
+            .prefetch_related("items__song__sheets")
             .all()
         )
 
@@ -204,7 +204,11 @@ class ServiceViewSet(viewsets.ModelViewSet):
 class ServiceSongViewSet(viewsets.ModelViewSet):
     """Add/remove/adjust songs within a service (owning team's leaders only)."""
 
-    queryset = ServiceSong.objects.select_related("service", "song").all()
+    queryset = (
+        ServiceSong.objects.select_related("service", "song")
+        .prefetch_related("song__sheets")
+        .all()
+    )
     serializer_class = ServiceSongSerializer
     permission_classes = [IsServiceTeamLeaderOrReadOnly]
     filterset_fields = ["service"]

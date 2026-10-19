@@ -303,27 +303,41 @@ export async function downloadSheet(
 
 // --- helpers -------------------------------------------------------------
 
+const YT_ID = /^[A-Za-z0-9_-]{11}$/;
+
+/**
+ * Extracts the video id from any common YouTube link: watch?v=, youtu.be/,
+ * shorts/, live/, embed/, v/ — on www., m., music. or youtube-nocookie.com.
+ */
 export function youtubeVideoId(url: string): string | null {
   if (!url) return null;
+  let u: URL;
   try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1) || null;
-    if (u.hostname.includes("youtube.com")) {
-      return u.searchParams.get("v") || (u.pathname.startsWith("/embed/")
-        ? u.pathname.split("/embed/")[1]
-        : null);
-    }
+    u = new URL(url.trim());
   } catch {
     return null;
   }
-  return null;
+  const host = u.hostname.replace(/^(www|m|music)\./, "");
+  let id: string | null = null;
+  if (host === "youtu.be") {
+    id = u.pathname.split("/")[1] || null;
+  } else if (host === "youtube.com" || host === "youtube-nocookie.com") {
+    const [, kind, rest] = u.pathname.split("/");
+    if (kind === "watch") id = u.searchParams.get("v");
+    else if (["shorts", "live", "embed", "v"].includes(kind)) id = rest || null;
+  }
+  return id && YT_ID.test(id) ? id : null;
 }
 
+/** Embed URL for open.spotify.com track/album/playlist/episode links. */
 export function spotifyEmbedUrl(url: string): string | null {
   try {
-    const u = new URL(url);
-    if (!u.hostname.includes("open.spotify.com")) return null;
-    return `https://open.spotify.com/embed${u.pathname}`;
+    const u = new URL(url.trim());
+    if (u.hostname !== "open.spotify.com") return null;
+    // Drop locale prefixes like /intl-de/.
+    const path = u.pathname.replace(/^\/intl-[a-z-]+/i, "");
+    const m = path.match(/^\/(track|album|playlist|episode|show|artist)\/[A-Za-z0-9]+/);
+    return m ? `https://open.spotify.com/embed${m[0]}` : null;
   } catch {
     return null;
   }

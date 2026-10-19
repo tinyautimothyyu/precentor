@@ -194,7 +194,7 @@ class SheetFileAdmin(admin.ModelAdmin):
 class ServiceSongInline(admin.TabularInline):
     model = ServiceSong
     extra = 0
-    fields = ("order", "song", "key_override", "format_override")
+    fields = ("order", "song", "key_override", "format_override", "reference_url_override")
     autocomplete_fields = ("song",)
     ordering = ("order",)
 

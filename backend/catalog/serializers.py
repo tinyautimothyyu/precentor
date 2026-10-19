@@ -211,16 +211,34 @@ class CongregationSerializer(serializers.ModelSerializer):
 # --- Services -------------------------------------------------------------
 
 
+class ServiceSheetSerializer(serializers.ModelSerializer):
+    """Sheet summary for a service item; the file itself stays behind /download/."""
+
+    type_display = serializers.CharField(source="get_type_display", read_only=True)
+    has_file = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SheetFile
+        fields = ["id", "type", "type_display", "key", "has_file"]
+
+    def get_has_file(self, obj):
+        return bool(obj.file)
+
+
 class ServiceSongSongSerializer(serializers.ModelSerializer):
     """Light song block embedded in a service item (for the playlist)."""
 
+    sheets = ServiceSheetSerializer(many=True, read_only=True)
+
     class Meta:
         model = Song
-        fields = ["id", "title", "default_key", "reference_url"]
+        fields = ["id", "title", "default_key", "reference_url", "owner_team", "sheets"]
 
 
 class ServiceSongSerializer(serializers.ModelSerializer):
     song_detail = ServiceSongSongSerializer(source="song", read_only=True)
+    # Effective track: the per-service override, else the song's default.
+    reference_url = serializers.CharField(read_only=True)
 
     class Meta:
         model = ServiceSong
@@ -232,8 +250,19 @@ class ServiceSongSerializer(serializers.ModelSerializer):
             "order",
             "key_override",
             "format_override",
+            "reference_url_override",
+            "reference_url",
         ]
         read_only_fields = ["order"]
+
+    def get_fields(self):
+        fields = super().get_fields()
+        # An item can't be moved to another service (or swapped to another song)
+        # after creation: permission checks only cover the item's current service.
+        if self.instance is not None:
+            fields["service"].read_only = True
+            fields["song"].read_only = True
+        return fields
 
 
 class ServiceListSerializer(serializers.ModelSerializer):

@@ -362,9 +362,17 @@ class ServiceSong(models.Model):
     format_override = models.CharField(
         max_length=20, choices=SheetType.choices, blank=True
     )
+    reference_url_override = models.URLField(
+        blank=True,
+        help_text="Reference track for this service only; falls back to the song's.",
+    )
 
     class Meta:
         ordering = ["order", "id"]
+
+    @property
+    def reference_url(self):
+        return self.reference_url_override or self.song.reference_url
 
     def __str__(self):
         return f"{self.service} · {self.order}. {self.song.title}"

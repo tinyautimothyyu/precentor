@@ -342,3 +342,24 @@ table.sheets td {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
 }
+
+/* --- service item editor & sheets --- */
+.setlist li { flex-wrap: wrap; }
+.setlist-meta { font-weight: 400; color: var(--muted); font-size: 13px; }
+.item-editor {
+  flex-basis: 100%;
+  font-weight: 400;
+  margin: 6px 0 4px;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.item-editor .hint { margin: -6px 0 12px; font-size: 13px; color: var(--muted); }
+.item-editor label.check { display: flex; align-items: center; gap: 8px; font-weight: 400; }
+.item-editor label.check input { width: auto; margin: 0; }
+.editor-actions { display: flex; align-items: center; gap: 14px; }
+.sheet-links { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; font-size: 14px; }
+.sheet-links .linkbtn { font-weight: 400; padding: 0; }
+.sheet-links .linkbtn.preferred { font-weight: 600; }
+.error-text { color: #a12622; }
