@@ -17,19 +17,23 @@ def _membership(user):
     return getattr(user, "membership", None)
 
 
+def is_approved_member(user):
+    """Authenticated and approved (or staff)."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_staff:
+        return True
+    m = _membership(user)
+    return bool(m and m.is_approved)
+
+
 class IsApproved(permissions.BasePermission):
     """Authenticated and approved (or staff). Gates downloads."""
 
     message = "Your account is pending approval."
 
     def has_permission(self, request, view):
-        user = request.user
-        if not user or not user.is_authenticated:
-            return False
-        if user.is_staff:
-            return True
-        m = _membership(user)
-        return bool(m and m.is_approved)
+        return is_approved_member(request.user)
 
 
 class IsLeaderOwnerOrReadOnly(permissions.BasePermission):

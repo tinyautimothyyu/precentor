@@ -49,6 +49,13 @@ export interface SheetFile {
   download_url: string | null;
   has_file: boolean;
   preferred_by_teams: number[];
+  /** Name of the file as uploaded. */
+  filename: string | null;
+  /** Uploader's team at upload time. */
+  owner_team_name: string | null;
+  /** Only provided to logged-in, approved members; null otherwise. */
+  uploaded_by_name: string | null;
+  uploaded_at: string;
 }
 
 export interface Alignment {
@@ -67,6 +74,8 @@ export interface SongListItem {
   ccli_number: string;
   tags: Tag[];
   owner_team: number | null;
+  owner_team_name: string | null;
+  owner_congregation_name: string | null;
   languages: string[];
   sheet_types: string[];
 }

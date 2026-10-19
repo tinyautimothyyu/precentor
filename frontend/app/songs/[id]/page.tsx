@@ -6,6 +6,14 @@ import { fetchSong, downloadSheet } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { SheetFile, SongDetail } from "@/lib/types";
 
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default function SongDetailPage({
   params,
 }: {
@@ -65,6 +73,18 @@ export default function SongDetailPage({
       {song.alternate_titles.length > 0 && (
         <p className="muted">Also: {song.alternate_titles.join(", ")}</p>
       )}
+      <p className="owner-line">
+        {song.owner_team_name ? (
+          <>
+            Owned by <strong>{song.owner_team_name}</strong>
+            {song.owner_congregation_name && (
+              <span className="muted"> ({song.owner_congregation_name})</span>
+            )}
+          </>
+        ) : (
+          <span className="muted">Shared library (admin)</span>
+        )}
+      </p>
       <p className="muted">
         {song.default_key && <>Key {song.default_key} · </>}
         {song.tempo && <>{song.tempo} bpm · </>}
@@ -96,16 +116,40 @@ export default function SongDetailPage({
         {song.sheets.length === 0 ? (
           <p className="muted">No sheet files uploaded yet.</p>
         ) : (
+          <div className="table-scroll">
           <table className="sheets">
             <thead>
-              <tr><th>Format</th><th>Key</th><th>Source</th><th></th></tr>
+              <tr>
+                <th>Format</th>
+                <th>Key</th>
+                <th>File</th>
+                <th>Uploaded by</th>
+                <th>Date</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody>
               {song.sheets.map((sh) => (
                 <tr key={sh.id}>
-                  <td>{sh.type_display}</td>
+                  <td>
+                    {sh.type_display}
+                    <div className="sheet-sub">{sh.source}</div>
+                  </td>
                   <td>{sh.key || "—"}</td>
-                  <td>{sh.source}</td>
+                  <td className="sheet-file" title={sh.filename ?? undefined}>
+                    {sh.filename || "—"}
+                  </td>
+                  <td>
+                    {sh.uploaded_by_name ?? (
+                      sh.owner_team_name ? null : <span className="muted">—</span>
+                    )}
+                    {sh.owner_team_name && (
+                      <div className={sh.uploaded_by_name ? "sheet-sub" : undefined}>
+                        {sh.owner_team_name}
+                      </div>
+                    )}
+                  </td>
+                  <td className="nowrap">{formatDate(sh.uploaded_at)}</td>
                   <td>
                     {!sh.has_file ? (
                       "—"
@@ -121,6 +165,7 @@ export default function SongDetailPage({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 

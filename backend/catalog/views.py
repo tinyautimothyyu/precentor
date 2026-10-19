@@ -3,6 +3,7 @@ import urllib.parse
 import urllib.request
 
 from django.conf import settings
+from django.db.models import Prefetch
 from django.http import FileResponse, Http404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -69,8 +70,18 @@ class SongViewSet(OwnedModelViewSet):
 
     def get_queryset(self):
         return (
-            Song.objects.all()
-            .prefetch_related("tags", "lyrics", "sheets", "alignments")
+            Song.objects.select_related("owner_team__congregation")
+            .prefetch_related(
+                "tags",
+                "lyrics",
+                "alignments",
+                Prefetch(
+                    "sheets",
+                    queryset=SheetFile.objects.select_related(
+                        "owner_team", "uploaded_by"
+                    ),
+                ),
+            )
             .distinct()
         )
 
@@ -89,7 +100,9 @@ class SongViewSet(OwnedModelViewSet):
 
 
 class SheetFileViewSet(OwnedModelViewSet):
-    queryset = SheetFile.objects.select_related("song").all()
+    queryset = SheetFile.objects.select_related(
+        "song", "owner_team", "uploaded_by"
+    ).all()
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
@@ -97,9 +110,11 @@ class SheetFileViewSet(OwnedModelViewSet):
         return SheetFileSerializer
 
     def perform_create(self, serializer):
+        upload = serializer.validated_data["file"]
         serializer.save(
             owner_team=_team_of(self.request.user),
             uploaded_by=self.request.user,
+            original_filename=upload.name.rsplit("/", 1)[-1][:255],
         )
 
     @action(
@@ -116,7 +131,7 @@ class SheetFileViewSet(OwnedModelViewSet):
         return FileResponse(
             sheet.file.open("rb"),
             as_attachment=True,
-            filename=sheet.file.name.split("/")[-1],
+            filename=sheet.original_filename or sheet.file.name.split("/")[-1],
         )
 
 

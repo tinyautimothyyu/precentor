@@ -24,12 +24,12 @@ The build is organized into self-contained chunks. Each chunk produces a coheren
 | 5 | Next.js frontend | ✅ Done — grew beyond read-only (see §3) |
 | — | JWT auth & roles | ✅ Done |
 | — | Services & playlist | ✅ Done |
-| — | Production Docker Compose + Caddy | 🔀 On branch `feature/prod-docker-compose` |
-| — | Per-service track/key/format overrides | 🔀 On branch `feature/service-track-overrides` |
-| — | Fix: sheet downloads saved with wrong file type | 🔀 On branch `fix/sheet-download-filetype` |
+| — | Production Docker Compose + Caddy | ✅ Done (PR #2) |
+| — | Per-service track/key/format overrides | ✅ Done (PR #3) |
+| — | Fix: sheet downloads saved with wrong file type | ✅ Done (PR #4) |
 | 6 | Instrumentation | ⬜ Not started |
-| 7 | Song profile quick wins | ⬜ Next up |
-| 8 | Custom tags | ⬜ Planned |
+| 7 | Song profile quick wins | 🔀 On branch `feature/song-profile-quick-wins` |
+| 8 | Custom tags | ⬜ Next up |
 | 9 | Link-first "Add song" with autofill | ⬜ Planned |
 | 10 | Sheet reuse | ⬜ Planned |
 | 11 | Structured lyrics & team flows | ⬜ Planned |
@@ -86,10 +86,10 @@ Library browse/filter, song detail, login/signup, leader song create/edit, sheet
 ### Auth & roles ✅ · Services & playlist ✅
 Team-owned services with ordered songs, in-app YouTube/Spotify embeds, "Play all on YouTube", optional server-side YouTube search (`YOUTUBE_API_KEY`).
 
-### On branches, awaiting merge 🔀
-- **`feature/prod-docker-compose`** — production stack (see §2.1).
-- **`feature/service-track-overrides`** — per-service reference track override, inline set-list editor (track/key/format), sheet links in "Now playing", robust YouTube link parsing (shorts/live/embed), and a **security fix**: set-list items can no longer be moved into another team's service. First backend tests (`docker compose exec web python manage.py test catalog`).
-- **`fix/sheet-download-filetype`** — downloads were always saved as `.pdf`, so non-PDF uploads (e.g. PNG) wouldn't open. The extension now comes from the real file; the API exposes `Content-Disposition` to the frontend.
+### Merged since the original plan ✅
+- **PR #2 `feature/prod-docker-compose`** — production stack (see §2.1).
+- **PR #3 `feature/service-track-overrides`** — per-service reference track override, inline set-list editor (track/key/format), sheet links in "Now playing", robust YouTube link parsing (shorts/live/embed), and a **security fix**: set-list items can no longer be moved into another team's service. First backend tests (`docker compose exec web python manage.py test catalog`).
+- **PR #4 `fix/sheet-download-filetype`** — downloads were always saved as `.pdf`, so non-PDF uploads (e.g. PNG) wouldn't open. The extension now comes from the real file; the API exposes `Content-Disposition` to the frontend.
 
 ### Known data issue
 The two seeded demo sheets (Amazing Grace, How Great Thou Art) are 69-byte placeholder PDFs with no pages; viewers can't open them. Replace them with real files during Chunk 3.
@@ -127,7 +127,7 @@ Event logging for the working metrics in the requirements doc: search vs. browse
 | Copyright holder | The publisher/rights owner — not the performing artist. | The © line on the sheet or SongSelect, e.g. "© 2011 Hillsong Music Publishing". |
 | Licensing notes | Anything unusual: approved translation, permission letter, not covered by CCLI. | Church office / worship coordinator. |
 
-Plus a **"Search SongSelect"** link beside the CCLI field, pre-filled with the title.
+Plus a **"Search SongSelect"** link beside the CCLI field, pre-filled with the title. The edit page also gains the missing **Licensing notes** field (previously only settable at creation).
 
 **Done when:** a member can tell at a glance who owns a song and who uploaded each sheet, and a new leader can fill in licensing fields without asking anyone.
 
@@ -226,7 +226,7 @@ Rendered:  Verse 1 · Chorus · Verse 2 · Chorus · [Music break] · Chorus · 
 
 | Order | Chunk | Estimate | Depends on |
 |---|---|---|---|
-| 1 | Merge the three open branches (prod compose, track overrides, download fix) | — | — |
+| 1 | ~~Merge the three open branches~~ (done: PRs #2–#4) | — | — |
 | 2 | 7 — Song profile quick wins | 1–2 days | — |
 | 3 | 8 — Custom tags | 1–2 days | — |
 | 4 | 9 — Link-first add song | 4–6 days | 7 (guidance, SongSelect link) |

@@ -1,11 +1,15 @@
+import shutil
+import tempfile
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from accounts.models import Membership
 
-from .models import Congregation, Service, ServiceSong, Song, Team
+from .models import Congregation, Service, ServiceSong, SheetFile, Song, Team
 
 User = get_user_model()
 
@@ -110,3 +114,92 @@ class ServiceSongApiTests(APITestCase):
         self.assertIn("sheets", item["song_detail"])
         self.assertEqual(item["song_detail"]["owner_team"], self.team_a.id)
         self.assertEqual(item["reference_url"], self.song.reference_url)
+
+
+TEMP_MEDIA = tempfile.mkdtemp()
+
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA)
+class SongProfileApiTests(APITestCase):
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(TEMP_MEDIA, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        cong = Congregation.objects.create(name="Main", primary_language="en")
+        self.team = Team.objects.create(name="Team A", congregation=cong)
+        self.leader = self._user("leaderA", Membership.Role.LEADER, approved=True)
+        self.leader.first_name, self.leader.last_name = "Lee", "Der"
+        self.leader.save()
+        self.pending = self._user("pending", Membership.Role.VOLUNTEER, approved=False)
+        self.song = Song.objects.create(
+            title="Song", copyright_holder="Holder", owner_team=self.team
+        )
+
+    def _user(self, username, role, approved):
+        user = User.objects.create_user(username=username, password="pw")
+        Membership.objects.filter(user=user).update(
+            team=self.team, role=role, is_approved=approved
+        )
+        return User.objects.get(pk=user.pk)
+
+    def _upload(self, name="My Chart.pdf"):
+        self.client.force_authenticate(self.leader)
+        res = self.client.post(
+            "/api/sheets/",
+            {
+                "song": self.song.id,
+                "type": "chord_chart",
+                "source": "purchased",
+                "file": SimpleUploadedFile(name, b"%PDF-1.4 test", "application/pdf"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, 201, res.content)
+        self.client.force_authenticate(None)
+        return SheetFile.objects.get(pk=res.json()["id"])
+
+    def _sheet_json(self):
+        return self.client.get(f"/api/songs/{self.song.id}/").json()["sheets"][0]
+
+    def test_song_shows_owner_team_and_congregation(self):
+        data = self.client.get(f"/api/songs/{self.song.id}/").json()
+        self.assertEqual(data["owner_team_name"], "Team A")
+        self.assertEqual(data["owner_congregation_name"], "Main")
+
+    def test_unowned_song_has_no_owner_name(self):
+        song = Song.objects.create(title="Hymn", copyright_holder="PD")
+        data = self.client.get(f"/api/songs/{song.id}/").json()
+        self.assertIsNone(data["owner_team_name"])
+
+    def test_original_filename_kept_when_storage_renames(self):
+        first = self._upload()
+        second = self._upload()  # same name: storage stores it under a new name
+        self.assertNotEqual(first.file.name, second.file.name)
+        self.assertEqual(second.original_filename, "My Chart.pdf")
+
+    def test_sheet_details_for_members(self):
+        self._upload()
+        self.client.force_authenticate(self.leader)
+        sheet = self._sheet_json()
+        self.assertEqual(sheet["filename"], "My Chart.pdf")
+        self.assertEqual(sheet["owner_team_name"], "Team A")
+        self.assertEqual(sheet["uploaded_by_name"], "Lee Der")
+        self.assertIsNotNone(sheet["uploaded_at"])
+
+    def test_uploader_name_hidden_from_anonymous_and_pending(self):
+        self._upload()
+        self.assertIsNone(self._sheet_json()["uploaded_by_name"])
+        self.client.force_authenticate(self.pending)
+        sheet = self._sheet_json()
+        self.assertIsNone(sheet["uploaded_by_name"])
+        self.assertEqual(sheet["owner_team_name"], "Team A")
+
+    def test_download_uses_original_filename(self):
+        self._upload()
+        second = self._upload()
+        self.client.force_authenticate(self.leader)
+        res = self.client.get(f"/api/sheets/{second.id}/download/")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('filename="My Chart.pdf"', res["Content-Disposition"])
