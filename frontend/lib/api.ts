@@ -280,9 +280,38 @@ export function searchYouTube(q: string): Promise<YouTubeResult[]> {
 
 // --- gated download (any approved account) -------------------------------
 
+/** Filename from a Content-Disposition header (RFC 6266 filename* or filename). */
+function dispositionFilename(header: string | null): string | null {
+  if (!header) return null;
+  const star = header.match(/filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      /* fall through to plain filename */
+    }
+  }
+  const plain = header.match(/filename\s*=\s*"?([^";]+)"?/);
+  return plain ? plain[1].trim() : null;
+}
+
+const MIME_EXT: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "image/heic": ".heic",
+};
+
+/**
+ * Downloads a sheet through the auth-gated endpoint. `baseName` is a friendly
+ * name (e.g. "Song - Lead sheet"); the extension always comes from the actual
+ * file, so a PNG is never saved as ".pdf" (and so on).
+ */
 export async function downloadSheet(
   id: string | number,
-  filename = "sheet"
+  baseName = "sheet"
 ): Promise<void> {
   const access = getAccess();
   const res = await fetch(`${API_BASE}/api/sheets/${id}/download/`, {
@@ -291,6 +320,14 @@ export async function downloadSheet(
   if (res.status === 401) throw new Error("Please log in to download sheets.");
   if (!res.ok) throw new Error("Download failed.");
   const blob = await res.blob();
+
+  const serverName = dispositionFilename(res.headers.get("Content-Disposition"));
+  const ext =
+    serverName?.match(/\.[A-Za-z0-9]{1,5}$/)?.[0] ??
+    MIME_EXT[blob.type.split(";")[0]] ??
+    "";
+  const filename = baseName.replace(/\.[A-Za-z0-9]{1,5}$/, "") + ext;
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -298,7 +335,8 @@ export async function downloadSheet(
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  // Revoking synchronously can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 // --- helpers -------------------------------------------------------------
