@@ -26,7 +26,7 @@ export default function SongDetailPage({
   async function onDownload(sheet: SheetFile) {
     setNotice(null);
     try {
-      await downloadSheet(sheet.id, `${song?.title} - ${sheet.type}.pdf`);
+      await downloadSheet(sheet.id, `${song?.title} - ${sheet.type_display}`);
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Download failed.");
     }
