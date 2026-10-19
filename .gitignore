@@ -14,6 +14,7 @@ db.sqlite3
 # Env
 .env
 backend/.env
+.env.prod
 
 # Node / Next.js
 node_modules/

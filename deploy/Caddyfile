@@ -1,0 +1,18 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Django admin static assets (collected into the shared volume).
+	handle_path /static/* {
+		root * /srv/static
+		file_server
+	}
+
+	@django path /api/* /admin /admin/* /healthz
+	handle @django {
+		reverse_proxy web:8000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

@@ -68,6 +68,18 @@ npm install
 npm run dev                        # http://localhost:3000
 ```
 
+### Production
+`docker-compose.prod.yml` runs Postgres, Django (gunicorn), the built Next.js app and
+Caddy (automatic HTTPS) on a single domain. Point the domain's DNS at the server and
+open ports 80/443, then:
+```bash
+cp .env.prod.example .env.prod      # set DOMAIN, POSTGRES_PASSWORD, SECRET_KEY
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env.prod exec web \
+  python manage.py createsuperuser
+```
+Changing `DOMAIN` requires `--build` (the API URL is baked into the frontend bundle).
+
 ## API
 
 | Endpoint | Auth | Purpose |
