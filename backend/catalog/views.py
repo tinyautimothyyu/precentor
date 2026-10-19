@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Case, Count, F, Prefetch, Q, When
 from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -13,6 +14,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from . import flows as song_flows
 from . import lookup as song_lookup
 from .filters import SongFilter
 from .models import (
@@ -22,6 +24,7 @@ from .models import (
     ServiceSong,
     SheetFile,
     Song,
+    SongFlow,
     SongLyrics,
     Tag,
 )
@@ -41,6 +44,7 @@ from .serializers import (
     SheetFileSerializer,
     SheetFileWriteSerializer,
     SongDetailSerializer,
+    SongFlowSerializer,
     SongLyricsSerializer,
     SongListSerializer,
     SongWriteSerializer,
@@ -80,6 +84,7 @@ class SongViewSet(OwnedModelViewSet):
                 "tags",
                 "lyrics",
                 "alignments",
+                Prefetch("flows", queryset=SongFlow.objects.select_related("owner_team")),
                 Prefetch(
                     "sheets",
                     # Most-reused first, so the sheet teams already use is on top.
@@ -161,6 +166,65 @@ class SheetFileViewSet(OwnedModelViewSet):
         else:
             sheet.preferred_by_teams.remove(team)
         return Response(SheetFileSerializer(sheet, context={"request": request}).data)
+
+
+class SongFlowViewSet(OwnedModelViewSet):
+    """
+    Team lyric flows. Reads are public; any approved leader can create a flow
+    on any song (owned by their team); only that team edits or deletes it.
+    """
+
+    queryset = SongFlow.objects.select_related("owner_team", "song").all()
+    serializer_class = SongFlowSerializer
+    filterset_fields = ["song", "owner_team"]
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx["team"] = _team_of(self.request.user)
+        return ctx
+
+    def perform_create(self, serializer):
+        team = _team_of(self.request.user)
+        if team is None:
+            raise ValidationError("You need to belong to a team to create a flow.")
+        serializer.save(owner_team=team, created_by=self.request.user)
+
+
+class SongArrangeView(APIView):
+    """
+    POST /api/songs/<id>/arrange/ {"flow"?, "steps"?, "team"?, "language"?}
+    -> the expanded lyrics. Precedence: explicit steps (live preview), then a
+    saved flow, then the team's default flow, then sections in written order.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, pk):
+        song = get_object_or_404(Song.objects.prefetch_related("lyrics"), pk=pk)
+        flow = None
+        steps = None
+        if "steps" in request.data:
+            try:
+                steps = song_flows.validate_steps(
+                    request.data["steps"], lambda sid: Song.objects.filter(pk=sid).exists()
+                )
+            except ValueError as exc:
+                raise ValidationError({"steps": str(exc)})
+        elif request.data.get("flow"):
+            flow = get_object_or_404(SongFlow, pk=request.data["flow"], song=song)
+        elif request.data.get("team"):
+            flow = SongFlow.objects.filter(
+                song=song, owner_team_id=request.data["team"], is_default=True
+            ).first()
+        if flow is not None:
+            steps = flow.steps
+        result = song_flows.expand(song, steps, request.data.get("language"))
+        result["flow"] = (
+            {"id": flow.id, "name": flow.name, "owner_team_name": flow.owner_team.name}
+            if flow
+            else None
+        )
+        return Response(result)
 
 
 class SongLyricsViewSet(OwnedModelViewSet):

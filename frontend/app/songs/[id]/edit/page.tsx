@@ -3,7 +3,6 @@
 import { use, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
-  createLyrics,
   deleteSheet,
   fetchSong,
   updateSong,
@@ -16,6 +15,7 @@ import YouTubePicker from "@/app/components/YouTubePicker";
 import LicensingHelp, { SongSelectLink } from "@/app/components/LicensingHelp";
 import TagInput from "@/app/components/TagInput";
 import SheetUsage from "@/app/components/SheetUsage";
+import LyricsManager from "@/app/components/LyricsManager";
 
 const normKey = (k: string | null | undefined) => (k ?? "").trim().toLowerCase();
 
@@ -64,7 +64,6 @@ export default function EditSongPage({
     source: "transcribed",
     file: null,
   });
-  const [lyric, setLyric] = useState({ language: "", text: "" });
 
   const reload = () => fetchSong(id).then(setSong);
 
@@ -172,26 +171,6 @@ export default function EditSongPage({
     try {
       await deleteSheet(sid);
       setMsg("Sheet removed.");
-      reload();
-    } catch (e2) {
-      reportError(e2);
-    }
-  }
-
-  async function addLyric(e: FormEvent) {
-    e.preventDefault();
-    setErr(null);
-    setMsg(null);
-    try {
-      const segments = [
-        {
-          segment_type: "verse1",
-          lines: lyric.text.split("\n").filter((l) => l.trim() !== ""),
-        },
-      ];
-      await createLyrics({ song: Number(id), language: lyric.language, segments });
-      setLyric({ language: "", text: "" });
-      setMsg("Lyrics added.");
       reload();
     } catch (e2) {
       reportError(e2);
@@ -344,21 +323,7 @@ export default function EditSongPage({
         </form>
       </div>
 
-      <div className="card">
-        <h4>Add lyrics / translation</h4>
-        <p className="muted" style={{ marginTop: 0 }}>
-          A new translation is owned by your team, even on another team&apos;s song.
-        </p>
-        <form onSubmit={addLyric}>
-          <label>Language
-            <input value={lyric.language} onChange={(e) => setLyric({ ...lyric, language: e.target.value })} placeholder="e.g. English, Chinese" required />
-          </label>
-          <label>Lyrics (one line per line)
-            <textarea rows={6} value={lyric.text} onChange={(e) => setLyric({ ...lyric, text: e.target.value })} required />
-          </label>
-          <button type="submit">Add lyrics</button>
-        </form>
-      </div>
+      <LyricsManager song={song} ownsTeam={ownsTeam} onChanged={reload} />
     </main>
   );
 }

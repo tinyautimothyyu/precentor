@@ -2,6 +2,7 @@ import hashlib
 
 from rest_framework import serializers
 
+from . import flows
 from .permissions import is_approved_member
 
 from .models import (
@@ -11,6 +12,7 @@ from .models import (
     ServiceSong,
     SheetFile,
     Song,
+    SongFlow,
     SongLyrics,
     Tag,
     Team,
@@ -124,6 +126,12 @@ class SongLyricsSerializer(serializers.ModelSerializer):
         read_only_fields = ["owner_team"]
         extra_kwargs = {"song": {"required": True}}
 
+    def validate_segments(self, value):
+        try:
+            return flows.validate_sections(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc))
+
 
 class LyricAlignmentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -137,6 +145,57 @@ class LyricAlignmentSerializer(serializers.ModelSerializer):
             "line_pairing",
         ]
         read_only_fields = ["owner_team"]
+
+
+class SongFlowSerializer(serializers.ModelSerializer):
+    owner_team_name = serializers.CharField(source="owner_team.name", read_only=True)
+
+    class Meta:
+        model = SongFlow
+        fields = [
+            "id",
+            "song",
+            "owner_team",
+            "owner_team_name",
+            "name",
+            "steps",
+            "is_default",
+            "updated_at",
+        ]
+        read_only_fields = ["owner_team", "updated_at"]
+
+    def get_fields(self):
+        fields = super().get_fields()
+        if self.instance is not None and not isinstance(self.instance, list):
+            fields["song"].read_only = True  # a flow can't move to another song
+        return fields
+
+    def validate_name(self, value):
+        name = " ".join(value.split())
+        if not name:
+            raise serializers.ValidationError("Give the flow a name.")
+        return name
+
+    def validate_steps(self, value):
+        try:
+            return flows.validate_steps(
+                value, lambda sid: Song.objects.filter(pk=sid).exists()
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc))
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        team = self.context.get("team")
+        song = attrs.get("song") or getattr(self.instance, "song", None)
+        name = attrs.get("name") or getattr(self.instance, "name", None)
+        owner = getattr(self.instance, "owner_team", None) or team
+        clash = SongFlow.objects.filter(song=song, owner_team=owner, name__iexact=name)
+        if self.instance is not None:
+            clash = clash.exclude(pk=self.instance.pk)
+        if owner is not None and clash.exists():
+            raise serializers.ValidationError({"name": "Your team already has a flow with this name."})
+        return attrs
 
 
 class SongListSerializer(serializers.ModelSerializer):
@@ -186,6 +245,7 @@ class SongDetailSerializer(SongListSerializer):
     lyrics = SongLyricsSerializer(many=True, read_only=True)
     sheets = SheetFileSerializer(many=True, read_only=True)
     alignments = LyricAlignmentSerializer(many=True, read_only=True)
+    flows = SongFlowSerializer(many=True, read_only=True)
 
     class Meta(SongListSerializer.Meta):
         fields = SongListSerializer.Meta.fields + [
@@ -195,6 +255,7 @@ class SongDetailSerializer(SongListSerializer):
             "lyrics",
             "sheets",
             "alignments",
+            "flows",
             "created_at",
             "updated_at",
         ]
@@ -353,8 +414,17 @@ class ServiceSongSerializer(serializers.ModelSerializer):
             "format_override",
             "reference_url_override",
             "reference_url",
+            "flow",
         ]
         read_only_fields = ["order"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        flow = attrs.get("flow")
+        song = attrs.get("song") or getattr(self.instance, "song", None)
+        if flow is not None and flow.song_id != getattr(song, "id", None):
+            raise serializers.ValidationError({"flow": "That flow belongs to a different song."})
+        return attrs
 
     def get_fields(self):
         fields = super().get_fields()

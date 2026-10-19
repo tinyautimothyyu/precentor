@@ -6,6 +6,8 @@ import { fetchSong, downloadSheet } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { SheetFile, SongDetail } from "@/lib/types";
 import SheetUsage from "@/app/components/SheetUsage";
+import ArrangementView from "@/app/components/ArrangementView";
+import { stepsToShorthand } from "@/lib/lyrics";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -189,27 +191,12 @@ export default function SongDetailPage({
         )}
       </section>
 
-      <section className="section">
-        <h4>Lyrics</h4>
-        {song.lyrics.length === 0 ? (
-          <p className="muted">No lyrics entered yet.</p>
-        ) : (
-          song.lyrics.map((ly) => (
-            <div key={ly.id} style={{ marginBottom: 20 }}>
-              <div className="lyric-lang">
-                {ly.language}
-                <span className="status">{ly.status_display}</span>
-              </div>
-              {ly.segments.map((seg, i) => (
-                <div key={i} className="segment">
-                  <div className="seg-type">{seg.segment_type}</div>
-                  <div className="lines">{seg.lines.join("\n")}</div>
-                </div>
-              ))}
-            </div>
-          ))
-        )}
-      </section>
+      <LyricsSection
+        song={song}
+        myTeam={user?.team ?? null}
+        isLeader={isLeader}
+        ownsTeam={ownsTeam}
+      />
 
       {song.alignments.length > 0 && (
         <section className="section">
@@ -223,5 +210,67 @@ export default function SongDetailPage({
         </section>
       )}
     </main>
+  );
+}
+
+function LyricsSection({
+  song,
+  myTeam,
+  isLeader,
+  ownsTeam,
+}: {
+  song: SongDetail;
+  myTeam: number | null;
+  isLeader: boolean;
+  ownsTeam: (teamId: number | null) => boolean;
+}) {
+  // Start on the viewer's team default flow, if they have one.
+  const [flowId, setFlowId] = useState<number | null>(
+    () => song.flows.find((f) => f.owner_team === myTeam && f.is_default)?.id ?? null
+  );
+  const flow = song.flows.find((f) => f.id === flowId) ?? null;
+
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h4>Lyrics</h4>
+        {isLeader && song.lyrics.length > 0 && (
+          <Link href={`/songs/${song.id}/flows/new`} className="linkbtn">
+            + New flow
+          </Link>
+        )}
+      </div>
+      {song.lyrics.length > 0 && (
+        <p className="muted lyric-langs">
+          {song.lyrics.map((l) => `${l.language} (${l.status_display})`).join(" · ")}
+        </p>
+      )}
+      {song.flows.length > 0 && (
+        <div className="flow-picker">
+          <label>
+            Flow
+            <select
+              value={flowId ?? ""}
+              onChange={(e) => setFlowId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">Sections in written order</option>
+              {song.flows.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.owner_team_name} — {f.name}
+                  {f.is_default ? " ★" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          {flow && <code className="flow-code">{stepsToShorthand(flow.steps)}</code>}
+          {flow && ownsTeam(flow.owner_team) && (
+            <Link href={`/songs/${song.id}/flows/${flow.id}`} className="linkbtn">
+              Edit flow
+            </Link>
+          )}
+        </div>
+      )}
+      <ArrangementView songId={song.id} flowId={flowId} />
+    </section>
   );
 }
