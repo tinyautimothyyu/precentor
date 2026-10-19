@@ -306,6 +306,18 @@ class SheetFile(TimeStampedModel):
         blank=True,
         help_text="Name of the file as uploaded (storage may rename it).",
     )
+    sha256 = models.CharField(
+        max_length=64,
+        blank=True,
+        db_index=True,
+        help_text="Content fingerprint; identical re-uploads are rejected.",
+    )
+    upload_reason = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Why this version exists when the same format and key already did.",
+    )
+    download_count = models.PositiveIntegerField(default=0)
     source = models.CharField(
         max_length=20, choices=Source.choices, default=Source.PURCHASED
     )
@@ -325,6 +337,11 @@ class SheetFile(TimeStampedModel):
 
     def __str__(self):
         return f"{self.song.title} — {self.get_type_display()} ({self.key or 'n/a'})"
+
+    @classmethod
+    def same_format(cls, song, type, key):
+        """Sheets of this song in the same format and key (key compared loosely)."""
+        return cls.objects.filter(song=song, type=type, key__iexact=(key or "").strip())
 
 
 # --- Services (a planned worship set — the "album" / playlist) ------------

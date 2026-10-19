@@ -4,7 +4,7 @@ import urllib.request
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import Case, Prefetch, Q, When
+from django.db.models import Case, Count, F, Prefetch, Q, When
 from django.http import FileResponse, Http404
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -27,6 +27,7 @@ from .models import (
 )
 from .permissions import (
     IsApproved,
+    IsApprovedLeader,
     IsLeaderOwnerOrReadOnly,
     IsServiceTeamLeaderOrReadOnly,
 )
@@ -81,9 +82,11 @@ class SongViewSet(OwnedModelViewSet):
                 "alignments",
                 Prefetch(
                     "sheets",
-                    queryset=SheetFile.objects.select_related(
-                        "owner_team", "uploaded_by"
-                    ),
+                    # Most-reused first, so the sheet teams already use is on top.
+                    queryset=SheetFile.objects.select_related("owner_team", "uploaded_by")
+                    .prefetch_related("preferred_by_teams")
+                    .annotate(preferred_count=Count("preferred_by_teams"))
+                    .order_by("-preferred_count", "-download_count", "type", "key", "id"),
                 ),
             )
             .distinct()
@@ -131,12 +134,33 @@ class SheetFileViewSet(OwnedModelViewSet):
         sheet = self.get_object()
         if not sheet.file:
             raise Http404("No file for this sheet.")
+        SheetFile.objects.filter(pk=sheet.pk).update(download_count=F("download_count") + 1)
         # Works for local FS and S3 alike via the storage API.
         return FileResponse(
             sheet.file.open("rb"),
             as_attachment=True,
             filename=sheet.original_filename or sheet.file.name.split("/")[-1],
         )
+
+
+    @action(detail=True, methods=["post"], permission_classes=[IsApprovedLeader])
+    def prefer(self, request, pk=None):
+        """
+        Body {"preferred": true|false}: mark/unmark this sheet as the caller's
+        team's preferred one. A team prefers at most one sheet per song and
+        format, so preferring this one clears its other preference.
+        """
+        sheet = self.get_object()
+        team = _team_of(request.user)
+        if team is None:
+            raise ValidationError("You need to belong to a team to set a preference.")
+        if request.data.get("preferred", True):
+            others = SheetFile.objects.filter(song=sheet.song, type=sheet.type).exclude(pk=sheet.pk)
+            team.preferred_sheets.remove(*others)
+            sheet.preferred_by_teams.add(team)
+        else:
+            sheet.preferred_by_teams.remove(team)
+        return Response(SheetFileSerializer(sheet, context={"request": request}).data)
 
 
 class SongLyricsViewSet(OwnedModelViewSet):

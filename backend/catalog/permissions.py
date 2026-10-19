@@ -36,6 +36,21 @@ class IsApproved(permissions.BasePermission):
         return is_approved_member(request.user)
 
 
+class IsApprovedLeader(permissions.BasePermission):
+    """Any approved leader (or staff), regardless of who owns the object."""
+
+    message = "Only an approved team leader can do this."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_staff:
+            return True
+        m = _membership(user)
+        return bool(m and m.is_leader)
+
+
 class IsLeaderOwnerOrReadOnly(permissions.BasePermission):
     """
     Reads are open (view decides whether the action is exposed). Writes require

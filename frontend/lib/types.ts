@@ -56,6 +56,9 @@ export interface SheetFile {
   /** Only provided to logged-in, approved members; null otherwise. */
   uploaded_by_name: string | null;
   uploaded_at: string;
+  /** Why this version exists alongside one in the same format and key. */
+  upload_reason: string;
+  download_count: number;
 }
 
 export interface Alignment {

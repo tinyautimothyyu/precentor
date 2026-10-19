@@ -393,3 +393,14 @@ table.sheets td {
 .lookup-summary p + p { margin-top: 4px; }
 .msg.warn { background: #fff4d6; color: #5c4400; }
 .msg.warn ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* --- sheet reuse --- */
+.sheet-usage { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.usage-pill { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; white-space: nowrap; }
+.linkbtn.prefer { font-size: 12px; padding: 0; white-space: nowrap; }
+.linkbtn.prefer.on { color: #7a5a00; }
+.sheet-reason { white-space: normal; font-style: italic; }
+.reuse-check ul { list-style: none; padding: 0; margin: 8px 0 12px; }
+.reuse-check li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 4px 0; }
+.reuse-check .reuse-file { font-weight: 600; }
+.reuse-check label { margin-bottom: 0; color: var(--text); }

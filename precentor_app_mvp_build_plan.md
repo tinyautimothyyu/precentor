@@ -31,8 +31,8 @@ The build is organized into self-contained chunks. Each chunk produces a coheren
 | 7 | Song profile quick wins | 🔀 On branch `feature/song-profile-quick-wins` |
 | 8 | Custom tags | 🔀 On branch `feature/custom-tags` |
 | 9 | Link-first "Add song" with autofill | 🔀 On branch `feature/link-first-add-song` |
-| 10 | Sheet reuse | ⬜ Next up |
-| 11 | Structured lyrics & team flows | ⬜ Planned |
+| 10 | Sheet reuse | 🔀 On branch `feature/sheet-reuse` |
+| 11 | Structured lyrics & team flows | ⬜ Next up |
 
 Rough total for chunks 7–11: **3–5 weeks** for one developer.
 
@@ -180,7 +180,8 @@ Plus a **"Search SongSelect"** link beside the CCLI field, pre-filled with the t
 
 Goal: keep the number of sheet versions per song low by making reuse the easy path.
 
-1. **Usage signals.** Show "★ Preferred by N teams" (existing `preferred_by_teams`) and "Used in N services"; sort most-used first; one-click "Mark as our team's preferred".
+1. **Usage signals.** Show "★ Preferred by N teams" (existing `preferred_by_teams`) and download counts; sort most-used first; one-click "Use as ours" (any leader, on any team's sheet; one preferred sheet per team per song and format).
+   *As built:* "Used in N services" was replaced by download counts — sheets aren't linked to services (a service only records a preferred format), so service usage can't be counted reliably.
 2. **Check before upload.** On choosing format + key: "A Chord chart in G already exists (Team B, used in 8 services) — use it instead?" Uploading anyway requires a short reason (e.g. "different arrangement", "simplified chords"), shown in the sheet table.
 3. **Block exact duplicates.** Store a SHA-256 of each file; reject identical re-uploads (catches the same file, not a re-scan).
 
