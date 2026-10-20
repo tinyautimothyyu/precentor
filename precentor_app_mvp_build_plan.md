@@ -1,7 +1,7 @@
 # Worship Ministry Application — Build Plan
 
 **Status:** v2 (consolidates the original MVP plan with the song-entry & song-profile plan)
-**Last updated:** 2026-10-19
+**Last updated:** 2026-10-20
 **Companion doc:** `precentor_app_requirements.md`
 
 ---
@@ -28,13 +28,15 @@ The build is organized into self-contained chunks. Each chunk produces a coheren
 | — | Per-service track/key/format overrides | ✅ Done (PR #3) |
 | — | Fix: sheet downloads saved with wrong file type | ✅ Done (PR #4) |
 | 6 | Instrumentation | ⬜ Not started |
-| 7 | Song profile quick wins | 🔀 On branch `feature/song-profile-quick-wins` |
-| 8 | Custom tags | 🔀 On branch `feature/custom-tags` |
-| 9 | Link-first "Add song" with autofill | 🔀 On branch `feature/link-first-add-song` |
-| 10 | Sheet reuse | 🔀 On branch `feature/sheet-reuse` |
-| 11 | Structured lyrics & team flows | 🔀 On branch `feature/lyrics-flows` |
+| 7 | Song profile quick wins | ✅ Done (PR #5) |
+| 8 | Custom tags | ✅ Done (PR #6) |
+| 9 | Link-first "Add song" with autofill | ✅ Done (PR #7) |
+| 10 | Sheet reuse | ✅ Done (PR #8) |
+| 11 | Structured lyrics & team flows | ✅ Done (PR #9) |
+| — | English title for non-English songs; SongSelect link by CCLI # | ✅ Done (PR #10) |
+| — | Dev: view the app on a phone via a tunnel | ✅ Done (in PR #5; see README) |
 
-Rough total for chunks 7–11: **3–5 weeks** for one developer.
+Chunks 7–11 were stacked PRs #5–#10, rolled into `main` by PR #11 (2026-10-20).
 
 ---
 
@@ -90,13 +92,17 @@ Team-owned services with ordered songs, in-app YouTube/Spotify embeds, "Play all
 - **PR #2 `feature/prod-docker-compose`** — production stack (see §2.1).
 - **PR #3 `feature/service-track-overrides`** — per-service reference track override, inline set-list editor (track/key/format), sheet links in "Now playing", robust YouTube link parsing (shorts/live/embed), and a **security fix**: set-list items can no longer be moved into another team's service. First backend tests (`docker compose exec web python manage.py test catalog`).
 - **PR #4 `fix/sheet-download-filetype`** — downloads were always saved as `.pdf`, so non-PDF uploads (e.g. PNG) wouldn't open. The extension now comes from the real file; the API exposes `Content-Disposition` to the frontend.
+- **PRs #5–#10 → #11** — Chunks 7–11 (details and "As built" notes in §5), plus:
+  - **English title** (`Song.english_title`): SongSelect only lists songs by English title, so Chinese songs record theirs. Autofilled from bilingual video titles (`【能不能 Let Me Stay】…`), used for the SongSelect search, matched by library search and duplicate checks, and shown beside the title in lists and set lists.
+  - **SongSelect link** opens the song directly when the CCLI number is known (`songselect.ccli.com/songs/<n>`).
+  - **Phone preview (dev):** optional same-origin API proxy (`API_PROXY_TARGET`) so one tunnel URL serves the whole app.
 
 ### Known data issue
 The two seeded demo sheets (Amazing Grace, How Great Thou Art) are 69-byte placeholder PDFs with no pages; viewers can't open them. Replace them with real files during Chunk 3.
 
 ---
 
-## 5. Remaining work
+## 5. Remaining work (Chunks 3, 6) and specs for Chunks 7–11 (done)
 
 ### Chunk 3 — Populate (manual)
 Enter 20–30 real songs, including at least two bilingual ones. Surfaces data-model problems while still cheap to fix — worth doing alongside Chunks 7–9, since the new add-song flow makes entry faster.
@@ -108,7 +114,7 @@ Event logging for the working metrics in the requirements doc: search vs. browse
 
 ---
 
-### Chunk 7 — Song profile quick wins (1–2 days)
+### Chunk 7 — Song profile quick wins (1–2 days) ✅
 
 **7a. Song ownership.** API adds `owner_team_name`; profile shows "Owned by **{team}** ({congregation})", or "Shared library (admin)" when unowned.
 
@@ -133,7 +139,7 @@ Plus a **"Search SongSelect"** link beside the CCLI field, pre-filled with the t
 
 ---
 
-### Chunk 8 — Custom tags (1–2 days)
+### Chunk 8 — Custom tags (1–2 days) ✅
 
 - Tag text box with type-ahead over existing tags (existing tags always offered first); "Create tag '…'" when nothing matches.
 - New tags: category `custom`, `created_by_team`; case-insensitive uniqueness, trimmed whitespace.
@@ -144,7 +150,7 @@ Plus a **"Search SongSelect"** link beside the CCLI field, pre-filled with the t
 
 ---
 
-### Chunk 9 — Link-first "Add song" with autofill (4–6 days)
+### Chunk 9 — Link-first "Add song" with autofill (4–6 days) ✅
 
 **Flow:**
 1. Step 1 — "Paste a YouTube or Spotify link" (with the existing YouTube search alongside), plus "Skip — enter details manually".
@@ -176,7 +182,7 @@ Plus a **"Search SongSelect"** link beside the CCLI field, pre-filled with the t
 
 ---
 
-### Chunk 10 — Sheet reuse (2–4 days)
+### Chunk 10 — Sheet reuse (2–4 days) ✅
 
 Goal: keep the number of sheet versions per song low by making reuse the easy path.
 
@@ -191,7 +197,7 @@ Deferred: 4. Versioning ("new version of…" collapsing older uploads) — only 
 
 ---
 
-### Chunk 11 — Structured lyrics & team flows (8–12 days)
+### Chunk 11 — Structured lyrics & team flows (8–12 days) ✅
 
 **Concept:** each section is written once; a *flow* is a list of references that the app expands into the full lyrics — no repeated copy-paste.
 
