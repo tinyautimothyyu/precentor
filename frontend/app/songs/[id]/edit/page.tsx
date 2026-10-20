@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { SHEET_TYPES, type SongDetail } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
+import LicensingHelp, { SongSelectLink } from "@/app/components/LicensingHelp";
 
 const SOURCES: [string, string][] = [
   ["purchased", "Purchased"],
@@ -24,6 +25,7 @@ interface MetaState {
   title: string;
   ccli_number: string;
   copyright_holder: string;
+  licensing_notes: string;
   default_key: string;
   tempo: string;
   reference_url: string;
@@ -66,6 +68,7 @@ export default function EditSongPage({
           title: s.title,
           ccli_number: s.ccli_number,
           copyright_holder: s.copyright_holder,
+          licensing_notes: s.licensing_notes || "",
           default_key: s.default_key || "",
           tempo: s.tempo ? String(s.tempo) : "",
           reference_url: s.reference_url || "",
@@ -191,12 +194,19 @@ export default function EditSongPage({
             <label>Title
               <input value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} required />
             </label>
-            <label>CCLI number
+            <label>CCLI number <span className="muted">(or &quot;Public Domain&quot;)</span>
               <input value={meta.ccli_number} onChange={(e) => setMeta({ ...meta, ccli_number: e.target.value })} required />
             </label>
+            <LicensingHelp field="ccli" />
+            <SongSelectLink title={meta.title} />
             <label>Copyright holder
               <input value={meta.copyright_holder} onChange={(e) => setMeta({ ...meta, copyright_holder: e.target.value })} required />
             </label>
+            <LicensingHelp field="copyright" />
+            <label>Licensing notes
+              <textarea rows={2} value={meta.licensing_notes} onChange={(e) => setMeta({ ...meta, licensing_notes: e.target.value })} />
+            </label>
+            <LicensingHelp field="notes" />
             <div className="row">
               <label>Default key
                 <input value={meta.default_key} onChange={(e) => setMeta({ ...meta, default_key: e.target.value })} />
@@ -235,6 +245,12 @@ export default function EditSongPage({
                 <tr key={sh.id}>
                   <td>{sh.type_display}</td>
                   <td>{sh.key || "—"}</td>
+                  <td className="sheet-file" title={sh.filename ?? undefined}>
+                    {sh.filename || "—"}
+                    <div className="sheet-sub">
+                      {[sh.uploaded_by_name, sh.owner_team_name].filter(Boolean).join(" · ")}
+                    </div>
+                  </td>
                   <td>
                     {ownsTeam(sh.owner_team) ? (
                       <button className="linkbtn" onClick={() => removeSheet(sh.id)}>remove</button>

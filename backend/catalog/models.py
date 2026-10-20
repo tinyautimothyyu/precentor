@@ -286,6 +286,11 @@ class SheetFile(TimeStampedModel):
     type = models.CharField(max_length=20, choices=SheetType.choices)
     key = models.CharField(max_length=10, blank=True)
     file = models.FileField(upload_to=sheet_upload_path)
+    original_filename = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Name of the file as uploaded (storage may rename it).",
+    )
     source = models.CharField(
         max_length=20, choices=Source.choices, default=Source.PURCHASED
     )

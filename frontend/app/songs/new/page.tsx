@@ -7,6 +7,7 @@ import { createSong, fetchTags, type ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Tag } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
+import LicensingHelp, { SongSelectLink } from "@/app/components/LicensingHelp";
 
 interface FormState {
   title: string;
@@ -109,14 +110,18 @@ export default function NewSongPage() {
             CCLI number * <span className="muted">(or &quot;Public Domain&quot;)</span>
             <input value={form.ccli_number} onChange={(e) => set("ccli_number", e.target.value)} required />
           </label>
+          <LicensingHelp field="ccli" />
+          <SongSelectLink title={form.title} />
           <label>
             Copyright holder *
             <input value={form.copyright_holder} onChange={(e) => set("copyright_holder", e.target.value)} required />
           </label>
+          <LicensingHelp field="copyright" />
           <label>
             Licensing notes
-            <input value={form.licensing_notes} onChange={(e) => set("licensing_notes", e.target.value)} />
+            <textarea rows={2} value={form.licensing_notes} onChange={(e) => set("licensing_notes", e.target.value)} />
           </label>
+          <LicensingHelp field="notes" />
           <div className="row">
             <label>
               Default key

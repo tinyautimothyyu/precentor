@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from .permissions import is_approved_member
+
 from .models import (
     Congregation,
     LyricAlignment,
@@ -23,6 +25,10 @@ class TagSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "category", "category_display"]
 
 
+def _team_name(team):
+    return team.name if team else None
+
+
 class SheetFileSerializer(serializers.ModelSerializer):
     type_display = serializers.CharField(source="get_type_display", read_only=True)
     download_url = serializers.SerializerMethodField()
@@ -30,6 +36,10 @@ class SheetFileSerializer(serializers.ModelSerializer):
     preferred_by_teams = serializers.PrimaryKeyRelatedField(
         many=True, read_only=True
     )
+    filename = serializers.SerializerMethodField()
+    owner_team_name = serializers.SerializerMethodField()
+    uploaded_by_name = serializers.SerializerMethodField()
+    uploaded_at = serializers.DateTimeField(source="created_at", read_only=True)
 
     class Meta:
         model = SheetFile
@@ -43,10 +53,31 @@ class SheetFileSerializer(serializers.ModelSerializer):
             "download_url",
             "has_file",
             "preferred_by_teams",
+            "filename",
+            "owner_team_name",
+            "uploaded_by_name",
+            "uploaded_at",
         ]
 
     def get_has_file(self, obj):
         return bool(obj.file)
+
+    def get_filename(self, obj):
+        if obj.original_filename:
+            return obj.original_filename
+        return obj.file.name.rsplit("/", 1)[-1] if obj.file else None
+
+    def get_owner_team_name(self, obj):
+        # The uploader's team at upload time (owner_team is stamped on create).
+        return _team_name(obj.owner_team)
+
+    def get_uploaded_by_name(self, obj):
+        # Member names are only shown to logged-in, approved members.
+        request = self.context.get("request")
+        if not obj.uploaded_by or not is_approved_member(getattr(request, "user", None)):
+            return None
+        user = obj.uploaded_by
+        return user.get_full_name() or user.username
 
     def get_download_url(self, obj):
         # Auth-gated endpoint — never the raw public media URL.
@@ -98,6 +129,8 @@ class SongListSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     languages = serializers.SerializerMethodField()
     sheet_types = serializers.SerializerMethodField()
+    owner_team_name = serializers.SerializerMethodField()
+    owner_congregation_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Song
@@ -110,9 +143,17 @@ class SongListSerializer(serializers.ModelSerializer):
             "ccli_number",
             "tags",
             "owner_team",
+            "owner_team_name",
+            "owner_congregation_name",
             "languages",
             "sheet_types",
         ]
+
+    def get_owner_team_name(self, obj):
+        return _team_name(obj.owner_team)
+
+    def get_owner_congregation_name(self, obj):
+        return obj.owner_team.congregation.name if obj.owner_team else None
 
     def get_languages(self, obj):
         return sorted({ly.language for ly in obj.lyrics.all()})
@@ -180,8 +221,9 @@ class SheetFileWriteSerializer(serializers.ModelSerializer):
             "file",
             "preferred_by_teams",
             "owner_team",
+            "original_filename",
         ]
-        read_only_fields = ["owner_team"]
+        read_only_fields = ["owner_team", "original_filename"]
         extra_kwargs = {"file": {"required": True}}
 
 
