@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { hasCjk } from "@/lib/text";
 
 type Field = "ccli" | "copyright" | "notes";
 
@@ -49,28 +50,29 @@ export default function LicensingHelp({ field }: { field: Field }) {
 }
 
 const SONGSELECT = "https://songselect.ccli.com";
-// Chinese/Japanese/Korean characters — SongSelect's search doesn't match these.
-const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
 
 const searchUrl = (q: string) => `${SONGSELECT}/search/results?search=${encodeURIComponent(q)}`;
 
 /**
  * SongSelect shortcut (new tab): opens the song directly when the CCLI number
- * is known; otherwise searches by title. For Chinese titles, which SongSelect
- * can't search, asks for the English title, artist or publisher instead.
+ * is known; otherwise searches by title — the English title for a Chinese
+ * song, since SongSelect can't search Chinese. Without one, asks for an
+ * artist or publisher to search by instead.
  */
 export function SongSelectLink({
   title,
+  englishTitle = "",
   ccli = "",
   artist = "",
 }: {
   title: string;
+  englishTitle?: string;
   ccli?: string;
   artist?: string;
 }) {
   const [alt, setAlt] = useState(artist);
   useEffect(() => setAlt((a) => a || artist), [artist]);
-  const q = title.trim();
+  const q = hasCjk(title) && englishTitle.trim() ? englishTitle.trim() : title.trim();
   const number = ccli.trim();
 
   if (/^\d+$/.test(number)) {
@@ -87,7 +89,7 @@ export function SongSelectLink({
       </a>
     );
   }
-  if (!CJK.test(q)) {
+  if (!hasCjk(q)) {
     return (
       <a href={searchUrl(q)} target="_blank" rel="noreferrer" className="songselect-link">
         Search SongSelect for &ldquo;{q}&rdquo; ↗
@@ -99,13 +101,14 @@ export function SongSelectLink({
     <div className="songselect-alt">
       <p className="muted">
         SongSelect can&apos;t search Chinese titles — it lists songs by their English
-        title. Search by the English title, artist or publisher instead:
+        title. Add the English title above if the song has one, or search by
+        artist or publisher:
       </p>
       <div className="songselect-alt-row">
         <input
           value={alt}
           onChange={(e) => setAlt(e.target.value)}
-          placeholder="e.g. Stream of Praise, or the English title"
+          placeholder="e.g. Stream of Praise"
           aria-label="SongSelect search"
         />
         {altQ ? (

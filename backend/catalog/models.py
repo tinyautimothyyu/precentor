@@ -140,6 +140,9 @@ class Tag(models.Model):
 
 class Song(TimeStampedModel):
     title = models.CharField(max_length=300)
+    # For non-English songs: the published English title, if there is one.
+    # SongSelect (CCLI) lists songs by English title, and it helps search.
+    english_title = models.CharField(max_length=300, blank=True)
     alternate_titles = ArrayField(
         models.CharField(max_length=300), blank=True, default=list
     )

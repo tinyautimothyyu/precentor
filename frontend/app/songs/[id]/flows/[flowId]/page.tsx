@@ -318,7 +318,10 @@ function RemixPicker({
           <ul className="add-results">
             {results.map((s) => (
               <li key={s.id}>
-                <span>{s.title}</span>
+                <span>
+                  {s.title}
+                  {s.english_title && <span className="muted"> · {s.english_title}</span>}
+                </span>
                 <button type="button" className="linkbtn" onClick={() => fetchSong(s.id).then(setPicked)}>choose</button>
               </li>
             ))}

@@ -212,6 +212,7 @@ class SongListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "title",
+            "english_title",
             "alternate_titles",
             "default_key",
             "tempo",
@@ -273,6 +274,7 @@ class SongWriteSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "title",
+            "english_title",
             "alternate_titles",
             "ccli_number",
             "copyright_holder",
@@ -394,7 +396,15 @@ class ServiceSongSongSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Song
-        fields = ["id", "title", "default_key", "reference_url", "owner_team", "sheets"]
+        fields = [
+            "id",
+            "title",
+            "english_title",
+            "default_key",
+            "reference_url",
+            "owner_team",
+            "sheets",
+        ]
 
 
 class ServiceSongSerializer(serializers.ModelSerializer):
