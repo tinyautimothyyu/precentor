@@ -466,3 +466,8 @@ table.sheets td {
 .step-marker { font-style: italic; color: var(--muted); }
 .step-actions { float: right; display: flex; gap: 10px; }
 .flow-editor .editor-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.songselect-alt { margin: -6px 0 14px; font-size: 13px; }
+.songselect-alt p { margin: 0 0 6px; }
+.songselect-alt-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.songselect-alt-row input { flex: 1 1 200px; margin: 0; }
+.songselect-alt-row .songselect-link { margin: 0; }

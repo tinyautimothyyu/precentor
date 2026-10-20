@@ -195,7 +195,7 @@ export default function EditSongPage({
               <input value={meta.ccli_number} onChange={(e) => setMeta({ ...meta, ccli_number: e.target.value })} required />
             </label>
             <LicensingHelp field="ccli" />
-            <SongSelectLink title={meta.title} />
+            <SongSelectLink title={meta.title} ccli={meta.ccli_number} />
             <label>Copyright holder
               <input value={meta.copyright_holder} onChange={(e) => setMeta({ ...meta, copyright_holder: e.target.value })} required />
             </label>
