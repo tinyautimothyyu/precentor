@@ -384,3 +384,12 @@ table.sheets td {
 .tag-options { list-style: none; margin: 6px 0 0; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
 .tag-options button { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 14px; cursor: pointer; color: var(--text); }
 .tag-options button.active { background: var(--accent-soft); }
+
+/* --- link-first add song --- */
+.link-step-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.autofill-badge { display: inline-block; margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: #fff4d6; color: #7a5a00; font-size: 11px; font-weight: 600; }
+.lookup-summary { margin: 4px 0 14px; padding: 10px 12px; background: var(--accent-soft); border-radius: 8px; font-size: 13px; }
+.lookup-summary p { margin: 0; }
+.lookup-summary p + p { margin-top: 4px; }
+.msg.warn { background: #fff4d6; color: #5c4400; }
+.msg.warn ul { margin: 6px 0 0; padding-left: 18px; }

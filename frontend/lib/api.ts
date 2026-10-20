@@ -9,6 +9,7 @@ import type {
   SheetFile,
   SongDetail,
   SongListItem,
+  SongLookup,
   Tag,
   TokenPair,
   User,
@@ -166,6 +167,10 @@ export function fetchSong(id: string | number): Promise<SongDetail> {
 export function fetchTags(category?: string): Promise<Paginated<Tag>> {
   const suffix = category ? `?category=${category}` : "";
   return request<Paginated<Tag>>(`/api/tags/${suffix}`);
+}
+/** Suggests song details from a YouTube/Spotify link (leaders only). */
+export function lookupSong(url: string): Promise<SongLookup> {
+  return request<SongLookup>("/api/songs/lookup/", { method: "POST", body: { url } });
 }
 /** Adds a custom tag, or returns the existing tag with that name (any case). */
 export function createTag(name: string): Promise<Tag> {

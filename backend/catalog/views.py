@@ -4,7 +4,7 @@ import urllib.request
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import Case, Prefetch, When
+from django.db.models import Case, Prefetch, Q, When
 from django.http import FileResponse, Http404
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -13,6 +13,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from . import lookup as song_lookup
 from .filters import SongFilter
 from .models import (
     Congregation,
@@ -301,6 +302,65 @@ class ServiceSongViewSet(viewsets.ModelViewSet):
 
 
 # --- Integrations & config -----------------------------------------------
+
+
+def possible_duplicates(title, video_id="", exclude_id=None, limit=5):
+    """Existing songs that may be the same song: same video, or similar title."""
+    found = {}
+    if video_id:
+        for song in Song.objects.filter(reference_url__contains=video_id)[:limit]:
+            found[song.id] = {"id": song.id, "title": song.title, "reason": "same video"}
+    if title:
+        similar = Song.objects.filter(
+            Q(title__iexact=title)
+            | Q(title__icontains=title)
+            | Q(alternate_titles__icontains=[title])
+        )
+        for song in similar[:limit]:
+            found.setdefault(
+                song.id, {"id": song.id, "title": song.title, "reason": "similar title"}
+            )
+    found.pop(exclude_id, None)
+    return list(found.values())[:limit]
+
+
+class SongLookupView(APIView):
+    """
+    POST {"url": "<YouTube or Spotify link>"} -> suggested song fields.
+
+    Each suggested field carries its source so the UI can flag it for review.
+    Upstream failures degrade to warnings; only an unusable link is a 400.
+    """
+
+    permission_classes = [IsLeaderOwnerOrReadOnly]
+
+    def post(self, request):
+        try:
+            result = song_lookup.lookup(request.data.get("url", ""))
+        except song_lookup.LookupError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        source = result.provider
+        fields = {
+            name: {"value": value, "source": source}
+            for name, value in (
+                ("title", result.title),
+                ("ccli_number", result.ccli_number),
+                ("copyright_holder", result.copyright_holder),
+                ("reference_url", result.reference_url),
+            )
+            if value
+        }
+        return Response(
+            {
+                "provider": result.provider,
+                "fields": fields,
+                "artist": result.artist,
+                "songwriters": result.songwriters,
+                "warnings": result.warnings,
+                "duplicates": possible_duplicates(result.title, result.video_id),
+            }
+        )
 
 
 class YouTubeSearchView(APIView):
