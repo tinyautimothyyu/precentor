@@ -15,6 +15,9 @@ import { SHEET_TYPES, type SongDetail } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
 import LicensingHelp, { SongSelectLink } from "@/app/components/LicensingHelp";
 import TagInput from "@/app/components/TagInput";
+import SheetUsage from "@/app/components/SheetUsage";
+
+const normKey = (k: string | null | undefined) => (k ?? "").trim().toLowerCase();
 
 const SOURCES: [string, string][] = [
   ["purchased", "Purchased"],
@@ -38,6 +41,8 @@ interface SheetState {
   key: string;
   source: string;
   file: File | null;
+  /** Required when a sheet in the same format and key already exists. */
+  reason: string;
 }
 
 export default function EditSongPage({
@@ -53,6 +58,7 @@ export default function EditSongPage({
   const [err, setErr] = useState<string | null>(null);
 
   const [sheet, setSheet] = useState<SheetState>({
+    reason: "",
     type: "chord_chart",
     key: "",
     source: "transcribed",
@@ -89,6 +95,10 @@ export default function EditSongPage({
   }
 
   const ownsSong = ownsTeam(song.owner_team);
+  // Existing sheets in the format/key being uploaded: offer reuse first.
+  const sameFormat = song.sheets.filter(
+    (sh) => sh.type === sheet.type && normKey(sh.key) === normKey(sheet.key)
+  );
   if (!isLeader) {
     return (
       <main className="container narrow">
@@ -141,13 +151,18 @@ export default function EditSongPage({
       fd.append("key", sheet.key);
       fd.append("source", sheet.source);
       fd.append("file", sheet.file);
+      if (sheet.reason.trim()) fd.append("upload_reason", sheet.reason.trim());
       await uploadSheet(fd);
-      setSheet({ type: "chord_chart", key: "", source: "transcribed", file: null });
+      setSheet({ type: "chord_chart", key: "", source: "transcribed", file: null, reason: "" });
       (e.target as HTMLFormElement).reset();
       setMsg("Sheet uploaded.");
       reload();
     } catch (e2) {
-      reportError(e2);
+      // Show the duplicate/same-format explanations as plain sentences.
+      const data = (e2 as ApiError).data as Record<string, unknown> | undefined;
+      const field = data && (data.file ?? data.upload_reason);
+      if (Array.isArray(field)) setErr(String(field[0]));
+      else reportError(e2);
     }
   }
 
@@ -257,6 +272,9 @@ export default function EditSongPage({
                     </div>
                   </td>
                   <td>
+                    <SheetUsage sheet={sh} myTeam={user?.team ?? null} canPrefer={isLeader} onChanged={reload} />
+                  </td>
+                  <td>
                     {ownsTeam(sh.owner_team) ? (
                       <button className="linkbtn" onClick={() => removeSheet(sh.id)}>remove</button>
                     ) : (
@@ -284,6 +302,37 @@ export default function EditSongPage({
               </select>
             </label>
           </div>
+          {sameFormat.length > 0 && (
+            <div className="msg warn reuse-check">
+              <strong>
+                {sameFormat.length === 1 ? "A" : `${sameFormat.length}`}{" "}
+                {SHEET_TYPES.find(([v]) => v === sheet.type)?.[1] ?? sheet.type}
+                {sameFormat.length === 1 ? "" : "s"}
+                {sheet.key.trim() ? ` in ${sheet.key.trim()}` : ""} already{" "}
+                {sameFormat.length === 1 ? "exists" : "exist"}. Can your team use{" "}
+                {sameFormat.length === 1 ? "it" : "one of them"} instead?
+              </strong>
+              <ul>
+                {sameFormat.map((sh) => (
+                  <li key={sh.id}>
+                    <span className="reuse-file">{sh.filename || "sheet"}</span>
+                    <span className="muted"> · {sh.owner_team_name ?? "admin"}</span>
+                    <SheetUsage sheet={sh} myTeam={user?.team ?? null} canPrefer={isLeader} onChanged={reload} />
+                  </li>
+                ))}
+              </ul>
+              <label>
+                Upload another version anyway — why is it needed? *
+                <input
+                  value={sheet.reason}
+                  maxLength={200}
+                  onChange={(e) => setSheet({ ...sheet, reason: e.target.value })}
+                  placeholder="e.g. different arrangement, simplified chords, capo version"
+                  required
+                />
+              </label>
+            </div>
+          )}
           <label>File
             <input
               type="file"

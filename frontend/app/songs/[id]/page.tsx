@@ -5,6 +5,7 @@ import Link from "next/link";
 import { fetchSong, downloadSheet } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { SheetFile, SongDetail } from "@/lib/types";
+import SheetUsage from "@/app/components/SheetUsage";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -20,21 +21,26 @@ export default function SongDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { isApproved, isLeader, ownsTeam } = useAuth();
+  const { user, isApproved, isLeader, ownsTeam } = useAuth();
   const [song, setSong] = useState<SongDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reload = () =>
     fetchSong(id)
       .then(setSong)
       .catch(() => setError("Song not found."));
+
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function onDownload(sheet: SheetFile) {
     setNotice(null);
     try {
       await downloadSheet(sheet.id, `${song?.title} - ${sheet.type_display}`);
+      reload(); // refresh the download count
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Download failed.");
     }
@@ -125,6 +131,7 @@ export default function SongDetailPage({
                 <th>File</th>
                 <th>Uploaded by</th>
                 <th>Date</th>
+                <th>Use</th>
                 <th></th>
               </tr>
             </thead>
@@ -138,6 +145,11 @@ export default function SongDetailPage({
                   <td>{sh.key || "—"}</td>
                   <td className="sheet-file" title={sh.filename ?? undefined}>
                     {sh.filename || "—"}
+                    {sh.upload_reason && (
+                      <div className="sheet-sub sheet-reason" title={sh.upload_reason}>
+                        Why this version: {sh.upload_reason}
+                      </div>
+                    )}
                   </td>
                   <td>
                     {sh.uploaded_by_name ?? (
@@ -150,6 +162,14 @@ export default function SongDetailPage({
                     )}
                   </td>
                   <td className="nowrap">{formatDate(sh.uploaded_at)}</td>
+                  <td>
+                    <SheetUsage
+                      sheet={sh}
+                      myTeam={user?.team ?? null}
+                      canPrefer={isLeader}
+                      onChanged={reload}
+                    />
+                  </td>
                   <td>
                     {!sh.has_file ? (
                       "—"

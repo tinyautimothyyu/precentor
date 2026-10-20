@@ -1,3 +1,5 @@
+import hashlib
+
 from rest_framework import serializers
 
 from .permissions import is_approved_member
@@ -69,6 +71,8 @@ class SheetFileSerializer(serializers.ModelSerializer):
             "owner_team_name",
             "uploaded_by_name",
             "uploaded_at",
+            "upload_reason",
+            "download_count",
         ]
 
     def get_has_file(self, obj):
@@ -234,9 +238,52 @@ class SheetFileWriteSerializer(serializers.ModelSerializer):
             "preferred_by_teams",
             "owner_team",
             "original_filename",
+            "upload_reason",
         ]
-        read_only_fields = ["owner_team", "original_filename"]
+        # Teams set their own preference via /prefer/, never for other teams.
+        read_only_fields = ["owner_team", "original_filename", "preferred_by_teams"]
         extra_kwargs = {"file": {"required": True}}
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if self.instance is not None:
+            return attrs
+        song, upload = attrs["song"], attrs["file"]
+        key = attrs.get("key", "").strip()
+        attrs["key"] = key[:1].upper() + key[1:]  # "bb" -> "Bb", "f#m" -> "F#m"
+
+        digest = hashlib.sha256()
+        for chunk in upload.chunks():
+            digest.update(chunk)
+        upload.seek(0)
+        attrs["sha256"] = digest.hexdigest()
+        identical = SheetFile.objects.filter(song=song, sha256=attrs["sha256"]).first()
+        if identical:
+            raise serializers.ValidationError(
+                {
+                    "file": (
+                        "This exact file is already uploaded for this song "
+                        f"({identical.get_type_display()}"
+                        f"{', key ' + identical.key if identical.key else ''})."
+                    )
+                }
+            )
+
+        existing = SheetFile.same_format(song, attrs["type"], attrs["key"]).first()
+        attrs["upload_reason"] = attrs.get("upload_reason", "").strip()
+        if existing and not attrs["upload_reason"]:
+            team = existing.owner_team.name if existing.owner_team else "admin"
+            raise serializers.ValidationError(
+                {
+                    "upload_reason": (
+                        f"A {existing.get_type_display()}"
+                        f"{' in ' + existing.key if existing.key else ''} already exists "
+                        f"(uploaded by {team}, downloaded {existing.download_count} times). "
+                        "Use it instead, or say why another version is needed."
+                    )
+                }
+            )
+        return attrs
 
 
 class TeamSerializer(serializers.ModelSerializer):

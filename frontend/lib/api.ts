@@ -210,6 +210,13 @@ export function uploadSheet(formData: FormData): Promise<SheetFile> {
     isForm: true,
   });
 }
+/** Mark/unmark a sheet as the caller's team's preferred one (any leader). */
+export function preferSheet(id: number, preferred: boolean): Promise<SheetFile> {
+  return request<SheetFile>(`/api/sheets/${id}/prefer/`, {
+    method: "POST",
+    body: { preferred },
+  });
+}
 export function deleteSheet(id: string | number): Promise<void> {
   return request<void>(`/api/sheets/${id}/`, { method: "DELETE" });
 }
