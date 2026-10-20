@@ -4,12 +4,14 @@ Core data model for the worship ministry catalog (MVP).
 Mirrors Section 4 of the requirements doc. Design decisions baked in here:
 - Relational core with JSONB (segments, line_pairing) for flexible nested data.
 - Licensing fields are mandatory on Song from day one, not retrofitted later.
-- Tags are a controlled vocabulary (Tag model with a category) rather than a
-  free-text array, so the taxonomy stays consistent as the library grows.
+- Tags are a curated vocabulary (Tag model with a category). Leaders may add
+  "custom" tags, matched case-insensitively against existing ones so near-
+  duplicates aren't created; staff tidy them up (merge/recategorise) in admin.
 - Translation status is an explicit workflow so drafts are never treated as
   service-ready without human verification.
 """
 from django.conf import settings
+from django.db.models.functions import Lower
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
@@ -108,13 +110,26 @@ class Tag(models.Model):
         SEASON = "season", "Season"
         LANGUAGE = "language", "Language"
         MOOD = "mood", "Mood"
+        CUSTOM = "custom", "Custom"
 
     category = models.CharField(max_length=20, choices=Category.choices)
     name = models.CharField(max_length=100)
+    created_by_team = models.ForeignKey(
+        "Team",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_tags",
+        help_text="Team that added this tag (custom tags). Null = admin.",
+    )
 
     class Meta:
         ordering = ["category", "name"]
-        unique_together = [("category", "name")]
+        constraints = [
+            models.UniqueConstraint(
+                Lower("name"), "category", name="tag_unique_name_per_category_ci"
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_category_display()}: {self.name}"
@@ -125,6 +140,9 @@ class Tag(models.Model):
 
 class Song(TimeStampedModel):
     title = models.CharField(max_length=300)
+    # For non-English songs: the published English title, if there is one.
+    # SongSelect (CCLI) lists songs by English title, and it helps search.
+    english_title = models.CharField(max_length=300, blank=True)
     alternate_titles = ArrayField(
         models.CharField(max_length=300), blank=True, default=list
     )
@@ -203,8 +221,8 @@ class SongLyrics(TimeStampedModel):
         default=list,
         blank=True,
         help_text=(
-            'List of segments, e.g. '
-            '[{"segment_type": "verse1", "lines": ["...", "..."]}]'
+            "Sections, each written once (see catalog/flows.py), e.g. "
+            '[{"id": "V1", "type": "verse", "label": "Verse 1", "lines": ["..."]}]'
         ),
     )
     translation_source = models.CharField(
@@ -259,6 +277,49 @@ class LyricAlignment(TimeStampedModel):
         )
 
 
+class SongFlow(TimeStampedModel):
+    """
+    A team's running order for a song, e.g. V1 C V2 C MB C ET. Steps reference
+    section ids, so the flow applies to every language. Any team may create
+    flows on any song; only the owning team edits its own flows.
+    """
+
+    song = models.ForeignKey(Song, on_delete=models.CASCADE, related_name="flows")
+    owner_team = models.ForeignKey(
+        "Team", on_delete=models.CASCADE, related_name="song_flows"
+    )
+    name = models.CharField(max_length=100, default="Standard")
+    steps = models.JSONField(default=list, blank=True)
+    is_default = models.BooleanField(
+        default=False, help_text="The team's default flow for this song."
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+
+    class Meta:
+        ordering = ["song__title", "owner_team__name", "-is_default", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["song", "owner_team", "name"], name="flow_unique_name_per_team"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.song.title} — {self.owner_team.name}: {self.name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_default:  # one default per team per song
+            SongFlow.objects.filter(song=self.song, owner_team=self.owner_team).exclude(
+                pk=self.pk
+            ).update(is_default=False)
+
+
 # --- Sheet files ---------------------------------------------------------
 
 
@@ -291,6 +352,18 @@ class SheetFile(TimeStampedModel):
         blank=True,
         help_text="Name of the file as uploaded (storage may rename it).",
     )
+    sha256 = models.CharField(
+        max_length=64,
+        blank=True,
+        db_index=True,
+        help_text="Content fingerprint; identical re-uploads are rejected.",
+    )
+    upload_reason = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Why this version exists when the same format and key already did.",
+    )
+    download_count = models.PositiveIntegerField(default=0)
     source = models.CharField(
         max_length=20, choices=Source.choices, default=Source.PURCHASED
     )
@@ -310,6 +383,11 @@ class SheetFile(TimeStampedModel):
 
     def __str__(self):
         return f"{self.song.title} — {self.get_type_display()} ({self.key or 'n/a'})"
+
+    @classmethod
+    def same_format(cls, song, type, key):
+        """Sheets of this song in the same format and key (key compared loosely)."""
+        return cls.objects.filter(song=song, type=type, key__iexact=(key or "").strip())
 
 
 # --- Services (a planned worship set — the "album" / playlist) ------------
@@ -370,6 +448,14 @@ class ServiceSong(models.Model):
     reference_url_override = models.URLField(
         blank=True,
         help_text="Reference track for this service only; falls back to the song's.",
+    )
+    flow = models.ForeignKey(
+        SongFlow,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="service_items",
+        help_text="Lyric flow for this service; falls back to the team's default.",
     )
 
     class Meta:

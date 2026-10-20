@@ -15,6 +15,7 @@ import {
   updateService,
   updateServiceSong,
   updateSong,
+  fetchFlows,
   watchVideosUrl,
   youtubeVideoId,
   type ApiError,
@@ -27,6 +28,8 @@ import {
   type SongListItem,
 } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
+import ArrangementView from "@/app/components/ArrangementView";
+import type { SongFlow } from "@/lib/types";
 
 function errorText(e: unknown): string {
   const ae = e as ApiError;
@@ -238,6 +241,9 @@ export default function ServiceDetailPage({
               <>
                 <div className="nowplaying">
                   <strong>{currentItem.song_detail.title}</strong>
+                  {currentItem.song_detail.english_title && (
+                    <span className="muted"> · {currentItem.song_detail.english_title}</span>
+                  )}
                   <span className="muted">
                     {" "}
                     · key {currentItem.key_override || currentItem.song_detail.default_key || "—"}
@@ -251,6 +257,7 @@ export default function ServiceDetailPage({
                   <p className="muted">No reference track for this song.</p>
                 )}
                 <SheetLinks item={currentItem} />
+                <LyricsToggle key={currentItem.id} item={currentItem} team={service.team} />
                 <div className="player-controls">
                   <button
                     className="linkbtn"
@@ -282,11 +289,13 @@ export default function ServiceDetailPage({
                   <button className="setlist-title" onClick={() => setCurrent(i)}>
                     {it.song_detail.title}
                     <span className="setlist-meta">
+                      {it.song_detail.english_title && ` · ${it.song_detail.english_title}`}
                       {it.key_override && ` · key ${it.key_override}`}
                       {it.format_override && ` · ${sheetTypeLabel(it.format_override)}`}
                       {!it.reference_url
                         ? " · no track"
                         : it.reference_url_override && " · custom track"}
+                      {it.flow && " · custom flow"}
                     </span>
                   </button>
                   {canManage && (
@@ -335,7 +344,10 @@ export default function ServiceDetailPage({
               <ul className="add-results">
                 {results.map((s) => (
                   <li key={s.id}>
-                    <span>{s.title}</span>
+                    <span>
+                      {s.title}
+                      {s.english_title && <span className="muted"> · {s.english_title}</span>}
+                    </span>
                     <button className="linkbtn" onClick={() => addSong(s.id)}>add</button>
                   </li>
                 ))}
@@ -464,6 +476,14 @@ function ItemEditor({
   const [url, setUrl] = useState(item.reference_url_override);
   const [key, setKey] = useState(item.key_override);
   const [format, setFormat] = useState(item.format_override);
+  const [flow, setFlow] = useState<number | null>(item.flow);
+  const [flows, setFlows] = useState<SongFlow[]>([]);
+
+  useEffect(() => {
+    fetchFlows(item.song)
+      .then((d) => setFlows(d.results))
+      .catch(() => setFlows([]));
+  }, [item.song]);
   const [asSongDefault, setAsSongDefault] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -483,6 +503,7 @@ function ItemEditor({
       await updateServiceSong(item.id, {
         key_override: key.trim(),
         format_override: format,
+        flow,
         // Once it's the song's default, this service no longer needs an override.
         reference_url_override: makeDefault ? "" : trimmed,
       });
@@ -556,6 +577,23 @@ function ItemEditor({
           </select>
         </label>
       </div>
+      <label>
+        Lyric flow
+        <select value={flow ?? ""} onChange={(e) => setFlow(e.target.value ? Number(e.target.value) : null)}>
+          <option value="">Team default (or sections in written order)</option>
+          {flows.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.owner_team_name} — {f.name}
+              {f.is_default ? " ★" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      {flows.length === 0 && (
+        <p className="hint">
+          No flows yet. <a href={`/songs/${item.song}/flows/new`}>Create one</a> on the song page.
+        </p>
+      )}
       <div className="editor-actions">
         <button type="submit" disabled={busy}>
           {busy ? "Saving…" : "Save"}
@@ -570,5 +608,17 @@ function ItemEditor({
         </button>
       </div>
     </form>
+  );
+}
+
+function LyricsToggle({ item, team }: { item: ServiceSongItem; team: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="lyrics-toggle">
+      <button type="button" className="linkbtn" onClick={() => setOpen((o) => !o)}>
+        {open ? "Hide lyrics" : "Show lyrics"}
+      </button>
+      {open && <ArrangementView songId={item.song} flowId={item.flow} team={team} compact />}
+    </div>
   );
 }

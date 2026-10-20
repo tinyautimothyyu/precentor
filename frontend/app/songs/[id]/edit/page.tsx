@@ -3,7 +3,6 @@
 import { use, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
-  createLyrics,
   deleteSheet,
   fetchSong,
   updateSong,
@@ -14,6 +13,12 @@ import { useAuth } from "@/lib/auth";
 import { SHEET_TYPES, type SongDetail } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
 import LicensingHelp, { SongSelectLink } from "@/app/components/LicensingHelp";
+import { hasCjk } from "@/lib/text";
+import TagInput from "@/app/components/TagInput";
+import SheetUsage from "@/app/components/SheetUsage";
+import LyricsManager from "@/app/components/LyricsManager";
+
+const normKey = (k: string | null | undefined) => (k ?? "").trim().toLowerCase();
 
 const SOURCES: [string, string][] = [
   ["purchased", "Purchased"],
@@ -23,12 +28,14 @@ const SOURCES: [string, string][] = [
 
 interface MetaState {
   title: string;
+  english_title: string;
   ccli_number: string;
   copyright_holder: string;
   licensing_notes: string;
   default_key: string;
   tempo: string;
   reference_url: string;
+  tags: number[];
 }
 
 interface SheetState {
@@ -36,6 +43,8 @@ interface SheetState {
   key: string;
   source: string;
   file: File | null;
+  /** Required when a sheet in the same format and key already exists. */
+  reason: string;
 }
 
 export default function EditSongPage({
@@ -51,12 +60,12 @@ export default function EditSongPage({
   const [err, setErr] = useState<string | null>(null);
 
   const [sheet, setSheet] = useState<SheetState>({
+    reason: "",
     type: "chord_chart",
     key: "",
     source: "transcribed",
     file: null,
   });
-  const [lyric, setLyric] = useState({ language: "", text: "" });
 
   const reload = () => fetchSong(id).then(setSong);
 
@@ -66,12 +75,14 @@ export default function EditSongPage({
         setSong(s);
         setMeta({
           title: s.title,
+          english_title: s.english_title,
           ccli_number: s.ccli_number,
           copyright_holder: s.copyright_holder,
           licensing_notes: s.licensing_notes || "",
           default_key: s.default_key || "",
           tempo: s.tempo ? String(s.tempo) : "",
           reference_url: s.reference_url || "",
+          tags: s.tags.map((t) => t.id),
         });
       })
       .catch(() => setErr("Song not found."));
@@ -86,6 +97,10 @@ export default function EditSongPage({
   }
 
   const ownsSong = ownsTeam(song.owner_team);
+  // Existing sheets in the format/key being uploaded: offer reuse first.
+  const sameFormat = song.sheets.filter(
+    (sh) => sh.type === sheet.type && normKey(sh.key) === normKey(sheet.key)
+  );
   if (!isLeader) {
     return (
       <main className="container narrow">
@@ -138,13 +153,18 @@ export default function EditSongPage({
       fd.append("key", sheet.key);
       fd.append("source", sheet.source);
       fd.append("file", sheet.file);
+      if (sheet.reason.trim()) fd.append("upload_reason", sheet.reason.trim());
       await uploadSheet(fd);
-      setSheet({ type: "chord_chart", key: "", source: "transcribed", file: null });
+      setSheet({ type: "chord_chart", key: "", source: "transcribed", file: null, reason: "" });
       (e.target as HTMLFormElement).reset();
       setMsg("Sheet uploaded.");
       reload();
     } catch (e2) {
-      reportError(e2);
+      // Show the duplicate/same-format explanations as plain sentences.
+      const data = (e2 as ApiError).data as Record<string, unknown> | undefined;
+      const field = data && (data.file ?? data.upload_reason);
+      if (Array.isArray(field)) setErr(String(field[0]));
+      else reportError(e2);
     }
   }
 
@@ -154,26 +174,6 @@ export default function EditSongPage({
     try {
       await deleteSheet(sid);
       setMsg("Sheet removed.");
-      reload();
-    } catch (e2) {
-      reportError(e2);
-    }
-  }
-
-  async function addLyric(e: FormEvent) {
-    e.preventDefault();
-    setErr(null);
-    setMsg(null);
-    try {
-      const segments = [
-        {
-          segment_type: "verse1",
-          lines: lyric.text.split("\n").filter((l) => l.trim() !== ""),
-        },
-      ];
-      await createLyrics({ song: Number(id), language: lyric.language, segments });
-      setLyric({ language: "", text: "" });
-      setMsg("Lyrics added.");
       reload();
     } catch (e2) {
       reportError(e2);
@@ -194,11 +194,21 @@ export default function EditSongPage({
             <label>Title
               <input value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} required />
             </label>
+            <label>English title <span className="muted">(if it has one)</span>
+              <input value={meta.english_title} onChange={(e) => setMeta({ ...meta, english_title: e.target.value })} />
+            </label>
+            <div className="field-help">
+              <p className="field-help-what">
+            {hasCjk(meta.title) && !meta.english_title.trim()
+              ? "Does this song have an English title? Add it — SongSelect (CCLI) lists Chinese songs by their English title, and it helps people find the song."
+              : "For non-English songs: the published English title, if there is one. Used for searching and SongSelect."}
+              </p>
+            </div>
             <label>CCLI number <span className="muted">(or &quot;Public Domain&quot;)</span>
               <input value={meta.ccli_number} onChange={(e) => setMeta({ ...meta, ccli_number: e.target.value })} required />
             </label>
             <LicensingHelp field="ccli" />
-            <SongSelectLink title={meta.title} />
+            <SongSelectLink title={meta.title} englishTitle={meta.english_title} ccli={meta.ccli_number} />
             <label>Copyright holder
               <input value={meta.copyright_holder} onChange={(e) => setMeta({ ...meta, copyright_holder: e.target.value })} required />
             </label>
@@ -223,6 +233,8 @@ export default function EditSongPage({
               />
             </label>
             <YouTubePicker onPick={(url) => setMeta({ ...meta, reference_url: url })} />
+            <label>Tags</label>
+            <TagInput value={meta.tags} onChange={(ids) => setMeta({ ...meta, tags: ids })} />
             <button type="submit">Save details</button>
           </form>
         </div>
@@ -252,6 +264,9 @@ export default function EditSongPage({
                     </div>
                   </td>
                   <td>
+                    <SheetUsage sheet={sh} myTeam={user?.team ?? null} canPrefer={isLeader} onChanged={reload} />
+                  </td>
+                  <td>
                     {ownsTeam(sh.owner_team) ? (
                       <button className="linkbtn" onClick={() => removeSheet(sh.id)}>remove</button>
                     ) : (
@@ -279,6 +294,37 @@ export default function EditSongPage({
               </select>
             </label>
           </div>
+          {sameFormat.length > 0 && (
+            <div className="msg warn reuse-check">
+              <strong>
+                {sameFormat.length === 1 ? "A" : `${sameFormat.length}`}{" "}
+                {SHEET_TYPES.find(([v]) => v === sheet.type)?.[1] ?? sheet.type}
+                {sameFormat.length === 1 ? "" : "s"}
+                {sheet.key.trim() ? ` in ${sheet.key.trim()}` : ""} already{" "}
+                {sameFormat.length === 1 ? "exists" : "exist"}. Can your team use{" "}
+                {sameFormat.length === 1 ? "it" : "one of them"} instead?
+              </strong>
+              <ul>
+                {sameFormat.map((sh) => (
+                  <li key={sh.id}>
+                    <span className="reuse-file">{sh.filename || "sheet"}</span>
+                    <span className="muted"> · {sh.owner_team_name ?? "admin"}</span>
+                    <SheetUsage sheet={sh} myTeam={user?.team ?? null} canPrefer={isLeader} onChanged={reload} />
+                  </li>
+                ))}
+              </ul>
+              <label>
+                Upload another version anyway — why is it needed? *
+                <input
+                  value={sheet.reason}
+                  maxLength={200}
+                  onChange={(e) => setSheet({ ...sheet, reason: e.target.value })}
+                  placeholder="e.g. different arrangement, simplified chords, capo version"
+                  required
+                />
+              </label>
+            </div>
+          )}
           <label>File
             <input
               type="file"
@@ -290,21 +336,7 @@ export default function EditSongPage({
         </form>
       </div>
 
-      <div className="card">
-        <h4>Add lyrics / translation</h4>
-        <p className="muted" style={{ marginTop: 0 }}>
-          A new translation is owned by your team, even on another team&apos;s song.
-        </p>
-        <form onSubmit={addLyric}>
-          <label>Language
-            <input value={lyric.language} onChange={(e) => setLyric({ ...lyric, language: e.target.value })} placeholder="e.g. English, Chinese" required />
-          </label>
-          <label>Lyrics (one line per line)
-            <textarea rows={6} value={lyric.text} onChange={(e) => setLyric({ ...lyric, text: e.target.value })} required />
-          </label>
-          <button type="submit">Add lyrics</button>
-        </form>
-      </div>
+      <LyricsManager song={song} ownsTeam={ownsTeam} onChanged={reload} />
     </main>
   );
 }

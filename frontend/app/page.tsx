@@ -77,6 +77,7 @@ export default function LibraryPage() {
           {songs.map((s) => (
             <Link key={s.id} href={`/songs/${s.id}`} className="card">
               <h3>{s.title}</h3>
+              {s.english_title && <div className="subtitle">{s.english_title}</div>}
               <div className="meta">
                 {s.default_key && <>Key {s.default_key} · </>}
                 {s.languages.join(", ") || "No lyrics yet"}

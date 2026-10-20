@@ -1,4 +1,6 @@
 import type {
+  Arrangement,
+  FlowStep,
   AppConfig,
   Congregation,
   Lyric,
@@ -8,7 +10,9 @@ import type {
   ServiceSongItem,
   SheetFile,
   SongDetail,
+  SongFlow,
   SongListItem,
+  SongLookup,
   Tag,
   TokenPair,
   User,
@@ -167,6 +171,14 @@ export function fetchTags(category?: string): Promise<Paginated<Tag>> {
   const suffix = category ? `?category=${category}` : "";
   return request<Paginated<Tag>>(`/api/tags/${suffix}`);
 }
+/** Suggests song details from a YouTube/Spotify link (leaders only). */
+export function lookupSong(url: string): Promise<SongLookup> {
+  return request<SongLookup>("/api/songs/lookup/", { method: "POST", body: { url } });
+}
+/** Adds a custom tag, or returns the existing tag with that name (any case). */
+export function createTag(name: string): Promise<Tag> {
+  return request<Tag>("/api/tags/", { method: "POST", body: { name } });
+}
 export function fetchCongregations(): Promise<Paginated<Congregation>> {
   return request<Paginated<Congregation>>(`/api/congregations/`);
 }
@@ -194,11 +206,50 @@ export function deleteSong(id: string | number): Promise<void> {
 export function createLyrics(payload: Record<string, unknown>): Promise<Lyric> {
   return request<Lyric>("/api/lyrics/", { method: "POST", body: payload });
 }
+export function updateLyrics(
+  id: number,
+  payload: Record<string, unknown>
+): Promise<Lyric> {
+  return request<Lyric>(`/api/lyrics/${id}/`, { method: "PATCH", body: payload });
+}
+
+// --- lyric flows ---------------------------------------------------------
+
+export function fetchFlows(songId: number): Promise<Paginated<SongFlow>> {
+  return request<Paginated<SongFlow>>(`/api/flows/?song=${songId}`);
+}
+export function createFlow(payload: Record<string, unknown>): Promise<SongFlow> {
+  return request<SongFlow>("/api/flows/", { method: "POST", body: payload });
+}
+export function updateFlow(id: number, payload: Record<string, unknown>): Promise<SongFlow> {
+  return request<SongFlow>(`/api/flows/${id}/`, { method: "PATCH", body: payload });
+}
+export function deleteFlow(id: number): Promise<void> {
+  return request<void>(`/api/flows/${id}/`, { method: "DELETE" });
+}
+/**
+ * Expanded lyrics for a song. Precedence: `steps` (unsaved preview), `flow`,
+ * the `team`'s default flow, then sections in written order.
+ */
+export function arrangeSong(
+  songId: number,
+  body: { steps?: FlowStep[]; flow?: number | null; team?: number | null; language?: string | null }
+): Promise<Arrangement> {
+  return request<Arrangement>(`/api/songs/${songId}/arrange/`, { method: "POST", body });
+}
+
 export function uploadSheet(formData: FormData): Promise<SheetFile> {
   return request<SheetFile>("/api/sheets/", {
     method: "POST",
     body: formData,
     isForm: true,
+  });
+}
+/** Mark/unmark a sheet as the caller's team's preferred one (any leader). */
+export function preferSheet(id: number, preferred: boolean): Promise<SheetFile> {
+  return request<SheetFile>(`/api/sheets/${id}/prefer/`, {
+    method: "POST",
+    body: { preferred },
   });
 }
 export function deleteSheet(id: string | number): Promise<void> {

@@ -29,10 +29,10 @@ The build is organized into self-contained chunks. Each chunk produces a coheren
 | — | Fix: sheet downloads saved with wrong file type | ✅ Done (PR #4) |
 | 6 | Instrumentation | ⬜ Not started |
 | 7 | Song profile quick wins | 🔀 On branch `feature/song-profile-quick-wins` |
-| 8 | Custom tags | ⬜ Next up |
-| 9 | Link-first "Add song" with autofill | ⬜ Planned |
-| 10 | Sheet reuse | ⬜ Planned |
-| 11 | Structured lyrics & team flows | ⬜ Planned |
+| 8 | Custom tags | 🔀 On branch `feature/custom-tags` |
+| 9 | Link-first "Add song" with autofill | 🔀 On branch `feature/link-first-add-song` |
+| 10 | Sheet reuse | 🔀 On branch `feature/sheet-reuse` |
+| 11 | Structured lyrics & team flows | 🔀 On branch `feature/lyrics-flows` |
 
 Rough total for chunks 7–11: **3–5 weeks** for one developer.
 
@@ -138,6 +138,7 @@ Plus a **"Search SongSelect"** link beside the CCLI field, pre-filled with the t
 - Tag text box with type-ahead over existing tags (existing tags always offered first); "Create tag '…'" when nothing matches.
 - New tags: category `custom`, `created_by_team`; case-insensitive uniqueness, trimmed whitespace.
 - Admin actions: merge duplicate tags; move a custom tag into a proper category.
+- Also fixes: the tag list was paginated at 25 (pickers would silently miss tags), and tags couldn't be edited after a song was created — the edit page now has the same tag input.
 
 **Done when:** a leader can add a tag that doesn't exist yet without creating near-duplicates of existing ones.
 
@@ -171,13 +172,16 @@ Plus a **"Search SongSelect"** link beside the CCLI field, pre-filled with the t
 
 **Done when:** pasting a typical official worship video link fills title (and usually artist) correctly, and a song can still be created entirely by hand.
 
+**As built:** without `YOUTUBE_API_KEY`, YouTube falls back to keyless oEmbed (title + channel only, so no CCLI/© extraction) — set the key in production to get description-based licensing suggestions. Duplicate detection also flags existing songs that already use the same video.
+
 ---
 
 ### Chunk 10 — Sheet reuse (2–4 days)
 
 Goal: keep the number of sheet versions per song low by making reuse the easy path.
 
-1. **Usage signals.** Show "★ Preferred by N teams" (existing `preferred_by_teams`) and "Used in N services"; sort most-used first; one-click "Mark as our team's preferred".
+1. **Usage signals.** Show "★ Preferred by N teams" (existing `preferred_by_teams`) and download counts; sort most-used first; one-click "Use as ours" (any leader, on any team's sheet; one preferred sheet per team per song and format).
+   *As built:* "Used in N services" was replaced by download counts — sheets aren't linked to services (a service only records a preferred format), so service usage can't be counted reliably.
 2. **Check before upload.** On choosing format + key: "A Chord chart in G already exists (Team B, used in 8 services) — use it instead?" Uploading anyway requires a short reason (e.g. "different arrangement", "simplified chords"), shown in the sheet table.
 3. **Block exact duplicates.** Store a SHA-256 of each file; reject identical re-uploads (catches the same file, not a re-scan).
 
@@ -219,6 +223,8 @@ Rendered:  Verse 1 · Chorus · Verse 2 · Chorus · [Music break] · Chorus · 
 **Licensing:** a remixed section shows the borrowed song's CCLI number and copyright alongside, so usage reporting covers both songs.
 
 **Done when:** a team can enter a song's sections once, type `V C MB V C ET`, and see the full lyrics in that order — including a section borrowed from another song — and pick that flow for a service.
+
+**As built:** shorthand also accepts `@<songId>:<section>` for remix steps (inserted by the "Section from another song" picker). Pasting lyrics whose order repeats sections offers to save that order as the team's default flow in the same step. Expansion lives server-side (`POST /api/songs/<id>/arrange/`) so v3 slide generation can reuse it.
 
 ---
 

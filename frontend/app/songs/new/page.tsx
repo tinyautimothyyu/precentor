@@ -3,14 +3,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createSong, fetchTags, type ApiError } from "@/lib/api";
+import { createSong, fetchSongs, lookupSong, type ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { Tag } from "@/lib/types";
+import type { SongLookup, SongLookupField } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
 import LicensingHelp, { SongSelectLink } from "@/app/components/LicensingHelp";
+import { hasCjk } from "@/lib/text";
+import TagInput from "@/app/components/TagInput";
 
 interface FormState {
   title: string;
+  english_title: string;
   ccli_number: string;
   copyright_holder: string;
   licensing_notes: string;
@@ -22,6 +25,7 @@ interface FormState {
 
 const EMPTY: FormState = {
   title: "",
+  english_title: "",
   ccli_number: "",
   copyright_holder: "",
   licensing_notes: "",
@@ -31,19 +35,63 @@ const EMPTY: FormState = {
   tags: [],
 };
 
+const PROVIDER_LABEL: Record<string, string> = { youtube: "YouTube", spotify: "Spotify" };
+
+interface Duplicate {
+  id: number;
+  title: string;
+  reason: string;
+}
+
+function errorText(e: unknown): string {
+  // request() puts the server's "detail" (or the JSON body) in the message.
+  return (e as ApiError).message;
+}
+
 export default function NewSongPage() {
   const { isLeader, loading } = useAuth();
   const router = useRouter();
+  const [step, setStep] = useState<"link" | "form">("link");
+  const [link, setLink] = useState("");
+  const [looking, setLooking] = useState(false);
+  const [lookupErr, setLookupErr] = useState<string | null>(null);
+  const [lookup, setLookup] = useState<SongLookup | null>(null);
+  // Fields filled from the link and not edited since (show a "please check" badge).
+  const [autofilled, setAutofilled] = useState<Partial<Record<keyof FormState, string>>>({});
   const [form, setForm] = useState<FormState>(EMPTY);
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [titleMatches, setTitleMatches] = useState<Duplicate[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Live duplicate check on the title, for both link and manual entry.
+  // Chinese titles are short, so they count from 2 characters.
   useEffect(() => {
-    fetchTags()
-      .then((d) => setTags(d.results))
-      .catch(() => {});
-  }, []);
+    const terms = [form.title, form.english_title]
+      .map((t) => t.trim())
+      .filter((t) => t.length >= (hasCjk(t) ? 2 : 3));
+    if (step !== "form" || !terms.length) {
+      setTitleMatches([]);
+      return;
+    }
+    const h = setTimeout(() => {
+      Promise.all(terms.map((t) => fetchSongs({ search: t })))
+        .then((pages) => {
+          const seen = new Set<number>();
+          const matches = pages
+            .flatMap((d) => d.results)
+            .filter((s) => !seen.has(s.id) && seen.add(s.id))
+            .slice(0, 5)
+            .map((s) => ({
+              id: s.id,
+              title: s.english_title ? `${s.title} · ${s.english_title}` : s.title,
+              reason: "similar title",
+            }));
+          setTitleMatches(matches);
+        })
+        .catch(() => setTitleMatches([]));
+    }, 400);
+    return () => clearTimeout(h);
+  }, [form.title, form.english_title, step]);
 
   if (!loading && !isLeader) {
     return (
@@ -61,13 +109,50 @@ export default function NewSongPage() {
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }));
+    setAutofilled((a) => {
+      if (!(k in a)) return a;
+      const next = { ...a };
+      delete next[k];
+      return next;
+    });
   }
 
-  function toggleTag(id: number) {
-    setForm((f) => ({
-      ...f,
-      tags: f.tags.includes(id) ? f.tags.filter((t) => t !== id) : [...f.tags, id],
-    }));
+  async function runLookup(url: string) {
+    setLink(url);
+    setLookupErr(null);
+    setLooking(true);
+    try {
+      const result = await lookupSong(url);
+      const filled: Partial<FormState> = {};
+      const sources: Partial<Record<keyof FormState, string>> = {};
+      for (const [name, f] of Object.entries(result.fields) as [
+        keyof FormState,
+        SongLookupField,
+      ][]) {
+        (filled as Record<string, string>)[name] = f.value;
+        if (name !== "reference_url") sources[name] = PROVIDER_LABEL[f.source] ?? f.source;
+      }
+      setForm({ ...EMPTY, reference_url: url.trim(), ...filled });
+      setAutofilled(sources);
+      setLookup(result);
+      setStep("form");
+    } catch (e) {
+      setLookupErr(errorText(e));
+    } finally {
+      setLooking(false);
+    }
+  }
+
+  function enterManually() {
+    setLookup(null);
+    setAutofilled({});
+    setForm({ ...EMPTY, reference_url: link.trim() });
+    setStep("form");
+  }
+
+  function backToLink() {
+    setStep("link");
+    setError(null);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -77,6 +162,7 @@ export default function NewSongPage() {
     try {
       const payload: Record<string, unknown> = {
         title: form.title,
+        english_title: form.english_title.trim(),
         ccli_number: form.ccli_number,
         copyright_holder: form.copyright_holder,
         licensing_notes: form.licensing_notes,
@@ -88,32 +174,139 @@ export default function NewSongPage() {
       const song = await createSong(payload);
       router.push(`/songs/${song.id}/edit`);
     } catch (err) {
-      const e2 = err as ApiError;
-      setError(e2.data ? JSON.stringify(e2.data) : e2.message);
+      setError(errorText(err));
     } finally {
       setBusy(false);
     }
+  }
+
+  function Badge({ field }: { field: keyof FormState }) {
+    const source = autofilled[field];
+    return source ? <span className="autofill-badge">from {source} — please check</span> : null;
+  }
+
+  // Lookup duplicates (same video first), then live title matches.
+  const duplicates: Duplicate[] = [];
+  for (const d of [...(lookup?.duplicates ?? []), ...titleMatches]) {
+    if (!duplicates.some((x) => x.id === d.id)) duplicates.push(d);
+  }
+
+  if (step === "link") {
+    return (
+      <main className="container narrow">
+        <Link href="/" className="back">← Back to library</Link>
+        <div className="card">
+          <h2>Add a song</h2>
+          <p className="muted">
+            Start with a YouTube or Spotify link and we&apos;ll fill in what we can.
+            You can check and edit everything before saving.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (link.trim()) void runLookup(link);
+            }}
+          >
+            {lookupErr && <div className="msg error">{lookupErr}</div>}
+            <label>
+              YouTube or Spotify link
+              <input
+                type="url"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=… or https://open.spotify.com/track/…"
+                autoFocus
+              />
+            </label>
+            <YouTubePicker onPick={(url) => void runLookup(url)} />
+            <div className="link-step-actions">
+              <button type="submit" disabled={looking || !link.trim()}>
+                {looking ? "Looking up…" : "Fill in details"}
+              </button>
+              <button type="button" className="linkbtn" onClick={enterManually}>
+                Skip — enter details manually
+              </button>
+            </div>
+          </form>
+        </div>
+      </main>
+    );
   }
 
   return (
     <main className="container narrow">
       <Link href="/" className="back">← Back to library</Link>
       <div className="card">
-        <h2>Add a song</h2>
+        <div className="detail-head">
+          <h2>Add a song</h2>
+          <button type="button" className="linkbtn" onClick={backToLink}>
+            {lookup ? "Use a different link" : "Start from a link instead"}
+          </button>
+        </div>
+
+        {lookup && (
+          <div className="lookup-summary">
+            <p>
+              Filled in from {PROVIDER_LABEL[lookup.provider]}
+              {lookup.artist && (
+                <>
+                  {" "}· Artist: <strong>{lookup.artist}</strong>
+                </>
+              )}
+              {lookup.songwriters.length > 0 && (
+                <>
+                  {" "}· Songwriters: <strong>{lookup.songwriters.join(", ")}</strong>
+                </>
+              )}
+            </p>
+            {lookup.warnings.map((w) => (
+              <p key={w} className="muted">{w}</p>
+            ))}
+          </div>
+        )}
+
+        {duplicates.length > 0 && (
+          <div className="msg warn">
+            <strong>Possible duplicates — check these before creating a new song:</strong>
+            <ul>
+              {duplicates.map((d) => (
+                <li key={d.id}>
+                  <a href={`/songs/${d.id}`} target="_blank" rel="noreferrer">
+                    {d.title} ↗
+                  </a>{" "}
+                  <span className="muted">({d.reason})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <form onSubmit={onSubmit}>
           {error && <div className="msg error">{error}</div>}
           <label>
-            Title *
+            Title * <Badge field="title" />
             <input value={form.title} onChange={(e) => set("title", e.target.value)} required />
           </label>
           <label>
-            CCLI number * <span className="muted">(or &quot;Public Domain&quot;)</span>
+            English title <span className="muted">(if it has one)</span> <Badge field="english_title" />
+            <input value={form.english_title} onChange={(e) => set("english_title", e.target.value)} />
+          </label>
+          <div className="field-help">
+            <p className="field-help-what">
+            {hasCjk(form.title) && !form.english_title.trim()
+              ? "Does this song have an English title? Add it — SongSelect (CCLI) lists Chinese songs by their English title, and it helps people find the song."
+              : "For non-English songs: the published English title, if there is one. Used for searching and SongSelect."}
+            </p>
+          </div>
+          <label>
+            CCLI number * <span className="muted">(or &quot;Public Domain&quot;)</span>{" "}
+            <Badge field="ccli_number" />
             <input value={form.ccli_number} onChange={(e) => set("ccli_number", e.target.value)} required />
           </label>
           <LicensingHelp field="ccli" />
-          <SongSelectLink title={form.title} />
+          <SongSelectLink title={form.title} englishTitle={form.english_title} ccli={form.ccli_number} artist={lookup?.artist ?? ""} />
           <label>
-            Copyright holder *
+            Copyright holder * <Badge field="copyright_holder" />
             <input value={form.copyright_holder} onChange={(e) => set("copyright_holder", e.target.value)} required />
           </label>
           <LicensingHelp field="copyright" />
@@ -142,18 +335,7 @@ export default function NewSongPage() {
           </label>
           <YouTubePicker onPick={(url) => set("reference_url", url)} />
           <label>Tags</label>
-          <div className="tag-picker">
-            {tags.map((t) => (
-              <button
-                type="button"
-                key={t.id}
-                className={`chip ${form.tags.includes(t.id) ? "on" : ""}`}
-                onClick={() => toggleTag(t.id)}
-              >
-                {t.category_display}: {t.name}
-              </button>
-            ))}
-          </div>
+          <TagInput value={form.tags} onChange={(ids) => set("tags", ids)} />
           <button type="submit" disabled={busy}>
             {busy ? "Saving…" : "Create song"}
           </button>
