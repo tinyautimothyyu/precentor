@@ -41,6 +41,25 @@ class TitleCleaningTests(SimpleTestCase):
         self.assertEqual(lookup.clean_channel("HillsongWorshipVEVO"), "HillsongWorship")
 
 
+class BilingualTitleTests(SimpleTestCase):
+    def test_splits_chinese_and_english_titles(self):
+        cases = [
+            ("能不能 Can I", "", ("能不能", "Can I")),
+            ("【能不能 Can I】讚美之泉 官方MV", "讚美之泉 Stream of Praise", ("能不能", "Can I")),
+            ("讚美之泉 - 能不能 | Can I (Official Lyric Video)", "讚美之泉", ("能不能", "Can I")),
+            ("約書亞樂團 - 祢是王 You Are King (Official Music Video)", "約書亞樂團 Joshua Band", ("祢是王", "You Are King")),
+            ("《我要看見》Shout to the Lord - 讚美之泉", "讚美之泉", ("我要看見", "Shout to the Lord")),
+            ("【能不能】讚美之泉 Stream of Praise 官方MV", "讚美之泉 Stream of Praise", ("能不能", "")),
+            ("奇異恩典 動態歌詞", "", ("奇異恩典", "")),
+        ]
+        for raw, artist, expected in cases:
+            with self.subTest(raw=raw):
+                self.assertEqual(lookup.split_bilingual(raw, artist), expected)
+
+    def test_english_only_titles_are_left_alone(self):
+        self.assertEqual(lookup.split_bilingual("What A Beautiful Name (Live)"), ("", ""))
+
+
 class ExtractionTests(SimpleTestCase):
     def test_description_fields(self):
         self.assertEqual(lookup.extract_ccli(DESCRIPTION), "7068424")
@@ -184,6 +203,23 @@ class LookupEndpointTests(APITestCase):
             {(d["id"], d["reason"]) for d in dups},
             {(same_video.id, "same video"), (same_title.id, "similar title")},
         )
+
+    @override_settings(YOUTUBE_API_KEY="")
+    def test_bilingual_title_suggests_english_title_and_matches_it(self):
+        existing = Song.objects.create(title="Neng Bu Neng", english_title="Can I", copyright_holder="H")
+        oembed = {"title": "能不能 Can I | 讚美之泉", "author_name": "讚美之泉 Stream of Praise"}
+        with mock.patch.object(lookup, "_get_json", fake_get_json({"https://www.youtube.com/oembed": oembed})):
+            data = self._post("https://youtu.be/nQWFzMvCfLE").json()
+        self.assertEqual(data["fields"]["title"]["value"], "能不能")
+        self.assertEqual(data["fields"]["english_title"], {"value": "Can I", "source": "youtube"})
+        self.assertEqual([d["id"] for d in data["duplicates"]], [existing.id])
+
+    def test_search_matches_english_title(self):
+        song = Song.objects.create(title="能不能", english_title="Can I", copyright_holder="H")
+        Song.objects.create(title="Other", copyright_holder="H")
+        res = self.client.get("/api/songs/", {"search": "can i"}).json()
+        self.assertEqual([s["id"] for s in res["results"]], [song.id])
+        self.assertEqual(res["results"][0]["english_title"], "Can I")
 
     def test_only_leaders_can_look_up(self):
         self.assertEqual(self._post("https://youtu.be/nQWFzMvCfLE", user=self.vol).status_code, 403)

@@ -73,7 +73,7 @@ class OwnedModelViewSet(viewsets.ModelViewSet):
 
 class SongViewSet(OwnedModelViewSet):
     filterset_class = SongFilter
-    search_fields = ["title", "alternate_titles", "ccli_number"]
+    search_fields = ["title", "english_title", "alternate_titles", "ccli_number"]
     ordering_fields = ["title", "tempo", "updated_at"]
     ordering = ["title"]
 
@@ -392,18 +392,21 @@ class ServiceSongViewSet(viewsets.ModelViewSet):
 # --- Integrations & config -----------------------------------------------
 
 
-def possible_duplicates(title, video_id="", exclude_id=None, limit=5):
+def possible_duplicates(title, video_id="", exclude_id=None, limit=5, english_title=""):
     """Existing songs that may be the same song: same video, or similar title."""
     found = {}
     if video_id:
         for song in Song.objects.filter(reference_url__contains=video_id)[:limit]:
             found[song.id] = {"id": song.id, "title": song.title, "reason": "same video"}
-    if title:
-        similar = Song.objects.filter(
-            Q(title__iexact=title)
-            | Q(title__icontains=title)
-            | Q(alternate_titles__icontains=[title])
+    similar_q = Q()
+    for t in {title.strip(), english_title.strip()} - {""}:
+        similar_q |= (
+            Q(title__icontains=t)
+            | Q(english_title__iexact=t)
+            | Q(alternate_titles__icontains=[t])
         )
+    if similar_q:
+        similar = Song.objects.filter(similar_q)
         for song in similar[:limit]:
             found.setdefault(
                 song.id, {"id": song.id, "title": song.title, "reason": "similar title"}
@@ -433,6 +436,7 @@ class SongLookupView(APIView):
             name: {"value": value, "source": source}
             for name, value in (
                 ("title", result.title),
+                ("english_title", result.english_title),
                 ("ccli_number", result.ccli_number),
                 ("copyright_holder", result.copyright_holder),
                 ("reference_url", result.reference_url),
@@ -446,7 +450,9 @@ class SongLookupView(APIView):
                 "artist": result.artist,
                 "songwriters": result.songwriters,
                 "warnings": result.warnings,
-                "duplicates": possible_duplicates(result.title, result.video_id),
+                "duplicates": possible_duplicates(
+                    result.title, result.video_id, english_title=result.english_title
+                ),
             }
         )
 

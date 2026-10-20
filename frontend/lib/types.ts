@@ -112,6 +112,8 @@ export interface Alignment {
 export interface SongListItem {
   id: number;
   title: string;
+  /** Published English title of a non-English song ("" if none). */
+  english_title: string;
   alternate_titles: string[];
   default_key: string;
   tempo: number | null;
@@ -173,6 +175,7 @@ export interface ServiceSongItem {
   song_detail: {
     id: number;
     title: string;
+    english_title: string;
     default_key: string;
     reference_url: string;
     owner_team: number | null;
@@ -231,7 +234,7 @@ export interface SongLookupField {
 export interface SongLookup {
   provider: "youtube" | "spotify";
   fields: Partial<
-    Record<"title" | "ccli_number" | "copyright_holder" | "reference_url", SongLookupField>
+    Record<"title" | "english_title" | "ccli_number" | "copyright_holder" | "reference_url", SongLookupField>
   >;
   artist: string;
   songwriters: string[];

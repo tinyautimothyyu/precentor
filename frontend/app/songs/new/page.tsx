@@ -8,10 +8,12 @@ import { useAuth } from "@/lib/auth";
 import type { SongLookup, SongLookupField } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
 import LicensingHelp, { SongSelectLink } from "@/app/components/LicensingHelp";
+import { hasCjk } from "@/lib/text";
 import TagInput from "@/app/components/TagInput";
 
 interface FormState {
   title: string;
+  english_title: string;
   ccli_number: string;
   copyright_holder: string;
   licensing_notes: string;
@@ -23,6 +25,7 @@ interface FormState {
 
 const EMPTY: FormState = {
   title: "",
+  english_title: "",
   ccli_number: "",
   copyright_holder: "",
   licensing_notes: "",
@@ -61,23 +64,34 @@ export default function NewSongPage() {
   const [busy, setBusy] = useState(false);
 
   // Live duplicate check on the title, for both link and manual entry.
+  // Chinese titles are short, so they count from 2 characters.
   useEffect(() => {
-    const title = form.title.trim();
-    if (step !== "form" || title.length < 3) {
+    const terms = [form.title, form.english_title]
+      .map((t) => t.trim())
+      .filter((t) => t.length >= (hasCjk(t) ? 2 : 3));
+    if (step !== "form" || !terms.length) {
       setTitleMatches([]);
       return;
     }
     const h = setTimeout(() => {
-      fetchSongs({ search: title })
-        .then((d) =>
-          setTitleMatches(
-            d.results.slice(0, 5).map((s) => ({ id: s.id, title: s.title, reason: "similar title" }))
-          )
-        )
+      Promise.all(terms.map((t) => fetchSongs({ search: t })))
+        .then((pages) => {
+          const seen = new Set<number>();
+          const matches = pages
+            .flatMap((d) => d.results)
+            .filter((s) => !seen.has(s.id) && seen.add(s.id))
+            .slice(0, 5)
+            .map((s) => ({
+              id: s.id,
+              title: s.english_title ? `${s.title} · ${s.english_title}` : s.title,
+              reason: "similar title",
+            }));
+          setTitleMatches(matches);
+        })
         .catch(() => setTitleMatches([]));
     }, 400);
     return () => clearTimeout(h);
-  }, [form.title, step]);
+  }, [form.title, form.english_title, step]);
 
   if (!loading && !isLeader) {
     return (
@@ -148,6 +162,7 @@ export default function NewSongPage() {
     try {
       const payload: Record<string, unknown> = {
         title: form.title,
+        english_title: form.english_title.trim(),
         ccli_number: form.ccli_number,
         copyright_holder: form.copyright_holder,
         licensing_notes: form.licensing_notes,
@@ -273,12 +288,23 @@ export default function NewSongPage() {
             <input value={form.title} onChange={(e) => set("title", e.target.value)} required />
           </label>
           <label>
+            English title <span className="muted">(if it has one)</span> <Badge field="english_title" />
+            <input value={form.english_title} onChange={(e) => set("english_title", e.target.value)} />
+          </label>
+          <div className="field-help">
+            <p className="field-help-what">
+            {hasCjk(form.title) && !form.english_title.trim()
+              ? "Does this song have an English title? Add it — SongSelect (CCLI) lists Chinese songs by their English title, and it helps people find the song."
+              : "For non-English songs: the published English title, if there is one. Used for searching and SongSelect."}
+            </p>
+          </div>
+          <label>
             CCLI number * <span className="muted">(or &quot;Public Domain&quot;)</span>{" "}
             <Badge field="ccli_number" />
             <input value={form.ccli_number} onChange={(e) => set("ccli_number", e.target.value)} required />
           </label>
           <LicensingHelp field="ccli" />
-          <SongSelectLink title={form.title} ccli={form.ccli_number} artist={lookup?.artist ?? ""} />
+          <SongSelectLink title={form.title} englishTitle={form.english_title} ccli={form.ccli_number} artist={lookup?.artist ?? ""} />
           <label>
             Copyright holder * <Badge field="copyright_holder" />
             <input value={form.copyright_holder} onChange={(e) => set("copyright_holder", e.target.value)} required />

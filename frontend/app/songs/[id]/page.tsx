@@ -78,6 +78,7 @@ export default function SongDetailPage({
           </Link>
         )}
       </div>
+      {song.english_title && <p className="subtitle detail-subtitle">{song.english_title}</p>}
       {song.alternate_titles.length > 0 && (
         <p className="muted">Also: {song.alternate_titles.join(", ")}</p>
       )}

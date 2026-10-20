@@ -241,6 +241,9 @@ export default function ServiceDetailPage({
               <>
                 <div className="nowplaying">
                   <strong>{currentItem.song_detail.title}</strong>
+                  {currentItem.song_detail.english_title && (
+                    <span className="muted"> · {currentItem.song_detail.english_title}</span>
+                  )}
                   <span className="muted">
                     {" "}
                     · key {currentItem.key_override || currentItem.song_detail.default_key || "—"}
@@ -286,6 +289,7 @@ export default function ServiceDetailPage({
                   <button className="setlist-title" onClick={() => setCurrent(i)}>
                     {it.song_detail.title}
                     <span className="setlist-meta">
+                      {it.song_detail.english_title && ` · ${it.song_detail.english_title}`}
                       {it.key_override && ` · key ${it.key_override}`}
                       {it.format_override && ` · ${sheetTypeLabel(it.format_override)}`}
                       {!it.reference_url
@@ -340,7 +344,10 @@ export default function ServiceDetailPage({
               <ul className="add-results">
                 {results.map((s) => (
                   <li key={s.id}>
-                    <span>{s.title}</span>
+                    <span>
+                      {s.title}
+                      {s.english_title && <span className="muted"> · {s.english_title}</span>}
+                    </span>
                     <button className="linkbtn" onClick={() => addSong(s.id)}>add</button>
                   </li>
                 ))}

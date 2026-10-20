@@ -29,6 +29,7 @@ class LookupResult:
     provider: str  # "youtube" | "spotify"
     reference_url: str
     title: str = ""
+    english_title: str = ""
     artist: str = ""
     ccli_number: str = ""
     copyright_holder: str = ""
@@ -109,6 +110,63 @@ def clean_title(raw, artist=""):
     title = _BRACKETED_NOISE.sub("", title)
     title = re.sub(r"\s{2,}", " ", title).strip(" -–—|")
     return title or raw.strip()
+
+
+# Chinese/Japanese/Korean characters.
+_CJK = "\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff"
+_HAS_CJK = re.compile(f"[{_CJK}]")
+# Title-marking brackets in Chinese video titles: 【能不能】, 《能不能》.
+_ZH_TITLE_BRACKET = re.compile(r"[【《「]([^】》」]+)[】》」]")
+_SEGMENT_SPLIT = re.compile(r"\s*[|•/／()\[\]（）【】《》「」]\s*|\s+[-–—]\s+")
+_SCRIPT_RUN = re.compile(
+    f"[{_CJK}][{_CJK}\\s\\d，、！？!?.·]*|[A-Za-z][A-Za-z0-9\\s',.!?&’]*"
+)
+_ZH_NOISE = re.compile(r"官方|動態歌詞|动态歌词|歌詞版|歌词版|歌詞|歌词|現場|现场|敬拜讚美|敬拜赞美|詩歌|诗歌|字幕|版$")
+_EN_NOISE = re.compile(rf"^(?:{_NOISE_WORDS}|mv|official|lyrics?|cover|worship)$", re.IGNORECASE)
+
+
+def has_cjk(text):
+    return bool(_HAS_CJK.search(text or ""))
+
+
+def split_bilingual(raw, artist=""):
+    """
+    Bilingual worship titles -> (Chinese title, English title).
+
+    "能不能 Can I"                      -> ("能不能", "Can I")
+    "【能不能 Can I】讚美之泉 官方MV"    -> ("能不能", "Can I")
+    "讚美之泉 - 能不能 | Can I (Official Lyric Video)" with artist 讚美之泉
+                                        -> ("能不能", "Can I")
+    Returns ("", "") when the title isn't a Chinese one.
+    """
+    text = _BRACKETED_NOISE.sub("", raw or "")
+    if not has_cjk(text):
+        return "", ""
+    marked = [m for m in _ZH_TITLE_BRACKET.findall(text) if has_cjk(m)]
+    # A bracketed title comes first; the rest may still hold the English title.
+    rest = _ZH_TITLE_BRACKET.sub(" | ", text, count=1) if marked else text
+    segments = marked[:1] + _SEGMENT_SPLIT.split(rest)
+    artist_parts = {p.strip().lower() for p in _SCRIPT_RUN.findall(artist or "")} | {
+        (artist or "").strip().lower()
+    }
+
+    def is_artist(piece):
+        p = piece.lower()
+        return bool(p) and any(p == a or (len(p) > 2 and p in a) for a in artist_parts if a)
+
+    zh = en = ""
+    for seg in segments:
+        for piece in _SCRIPT_RUN.findall(seg):
+            piece = re.sub(r"\s{2,}", " ", piece).strip(" ,.!?·")
+            if not piece or is_artist(piece):
+                continue
+            if has_cjk(piece):
+                piece = _ZH_NOISE.sub("", piece).strip()
+                if piece and not is_artist(piece) and not zh:
+                    zh = piece
+            elif len(re.sub(r"[^A-Za-z]", "", piece)) >= 2 and not _EN_NOISE.match(piece) and not en:
+                en = piece
+    return zh, en
 
 
 def clean_channel(name):
@@ -194,6 +252,9 @@ def _youtube(video_id):
             raise LookupError("Couldn't read that YouTube video. Is it public?")
     result.artist = clean_channel(channel)
     result.title = clean_title(raw_title, result.artist)
+    zh, en = split_bilingual(raw_title, result.artist)
+    if zh:
+        result.title, result.english_title = zh, en
     result.ccli_number = extract_ccli(description)
     result.copyright_holder = extract_copyright(description)
     result.songwriters = extract_songwriters(description)
@@ -215,6 +276,9 @@ def _spotify(track_id):
     except Exception:
         raise LookupError("Couldn't read that Spotify track.")
     result.title = clean_title(data.get("title", ""))
+    zh, en = split_bilingual(data.get("title", ""))
+    if zh:
+        result.title, result.english_title = zh, en
     result.warnings.append(
         "Spotify links only provide the song title for now; "
         "artist and licensing details need to be entered by hand."

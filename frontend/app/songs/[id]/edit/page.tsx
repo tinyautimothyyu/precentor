@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { SHEET_TYPES, type SongDetail } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
 import LicensingHelp, { SongSelectLink } from "@/app/components/LicensingHelp";
+import { hasCjk } from "@/lib/text";
 import TagInput from "@/app/components/TagInput";
 import SheetUsage from "@/app/components/SheetUsage";
 import LyricsManager from "@/app/components/LyricsManager";
@@ -27,6 +28,7 @@ const SOURCES: [string, string][] = [
 
 interface MetaState {
   title: string;
+  english_title: string;
   ccli_number: string;
   copyright_holder: string;
   licensing_notes: string;
@@ -73,6 +75,7 @@ export default function EditSongPage({
         setSong(s);
         setMeta({
           title: s.title,
+          english_title: s.english_title,
           ccli_number: s.ccli_number,
           copyright_holder: s.copyright_holder,
           licensing_notes: s.licensing_notes || "",
@@ -191,11 +194,21 @@ export default function EditSongPage({
             <label>Title
               <input value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} required />
             </label>
+            <label>English title <span className="muted">(if it has one)</span>
+              <input value={meta.english_title} onChange={(e) => setMeta({ ...meta, english_title: e.target.value })} />
+            </label>
+            <div className="field-help">
+              <p className="field-help-what">
+            {hasCjk(meta.title) && !meta.english_title.trim()
+              ? "Does this song have an English title? Add it — SongSelect (CCLI) lists Chinese songs by their English title, and it helps people find the song."
+              : "For non-English songs: the published English title, if there is one. Used for searching and SongSelect."}
+              </p>
+            </div>
             <label>CCLI number <span className="muted">(or &quot;Public Domain&quot;)</span>
               <input value={meta.ccli_number} onChange={(e) => setMeta({ ...meta, ccli_number: e.target.value })} required />
             </label>
             <LicensingHelp field="ccli" />
-            <SongSelectLink title={meta.title} ccli={meta.ccli_number} />
+            <SongSelectLink title={meta.title} englishTitle={meta.english_title} ccli={meta.ccli_number} />
             <label>Copyright holder
               <input value={meta.copyright_holder} onChange={(e) => setMeta({ ...meta, copyright_holder: e.target.value })} required />
             </label>
