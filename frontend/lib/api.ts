@@ -167,6 +167,10 @@ export function fetchTags(category?: string): Promise<Paginated<Tag>> {
   const suffix = category ? `?category=${category}` : "";
   return request<Paginated<Tag>>(`/api/tags/${suffix}`);
 }
+/** Adds a custom tag, or returns the existing tag with that name (any case). */
+export function createTag(name: string): Promise<Tag> {
+  return request<Tag>("/api/tags/", { method: "POST", body: { name } });
+}
 export function fetchCongregations(): Promise<Paginated<Congregation>> {
   return request<Paginated<Congregation>>(`/api/congregations/`);
 }

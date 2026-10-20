@@ -25,6 +25,18 @@ class TagSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "category", "category_display"]
 
 
+class TagCreateSerializer(serializers.Serializer):
+    """Leaders add custom tags by name only; category is always "custom"."""
+
+    name = serializers.CharField(max_length=100)
+
+    def validate_name(self, value):
+        name = " ".join(value.split())  # trim + collapse inner whitespace
+        if not name:
+            raise serializers.ValidationError("Tag name can't be blank.")
+        return name
+
+
 def _team_name(team):
     return team.name if team else None
 

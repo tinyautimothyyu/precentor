@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth";
 import { SHEET_TYPES, type SongDetail } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
 import LicensingHelp, { SongSelectLink } from "@/app/components/LicensingHelp";
+import TagInput from "@/app/components/TagInput";
 
 const SOURCES: [string, string][] = [
   ["purchased", "Purchased"],
@@ -29,6 +30,7 @@ interface MetaState {
   default_key: string;
   tempo: string;
   reference_url: string;
+  tags: number[];
 }
 
 interface SheetState {
@@ -72,6 +74,7 @@ export default function EditSongPage({
           default_key: s.default_key || "",
           tempo: s.tempo ? String(s.tempo) : "",
           reference_url: s.reference_url || "",
+          tags: s.tags.map((t) => t.id),
         });
       })
       .catch(() => setErr("Song not found."));
@@ -223,6 +226,8 @@ export default function EditSongPage({
               />
             </label>
             <YouTubePicker onPick={(url) => setMeta({ ...meta, reference_url: url })} />
+            <label>Tags</label>
+            <TagInput value={meta.tags} onChange={(ids) => setMeta({ ...meta, tags: ids })} />
             <button type="submit">Save details</button>
           </form>
         </div>

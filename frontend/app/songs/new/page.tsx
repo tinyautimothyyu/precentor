@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createSong, fetchTags, type ApiError } from "@/lib/api";
+import { createSong, type ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { Tag } from "@/lib/types";
 import YouTubePicker from "@/app/components/YouTubePicker";
 import LicensingHelp, { SongSelectLink } from "@/app/components/LicensingHelp";
+import TagInput from "@/app/components/TagInput";
 
 interface FormState {
   title: string;
@@ -35,15 +35,8 @@ export default function NewSongPage() {
   const { isLeader, loading } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState<FormState>(EMPTY);
-  const [tags, setTags] = useState<Tag[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    fetchTags()
-      .then((d) => setTags(d.results))
-      .catch(() => {});
-  }, []);
 
   if (!loading && !isLeader) {
     return (
@@ -61,13 +54,6 @@ export default function NewSongPage() {
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }));
-  }
-
-  function toggleTag(id: number) {
-    setForm((f) => ({
-      ...f,
-      tags: f.tags.includes(id) ? f.tags.filter((t) => t !== id) : [...f.tags, id],
-    }));
   }
 
   async function onSubmit(e: FormEvent) {
@@ -142,18 +128,7 @@ export default function NewSongPage() {
           </label>
           <YouTubePicker onPick={(url) => set("reference_url", url)} />
           <label>Tags</label>
-          <div className="tag-picker">
-            {tags.map((t) => (
-              <button
-                type="button"
-                key={t.id}
-                className={`chip ${form.tags.includes(t.id) ? "on" : ""}`}
-                onClick={() => toggleTag(t.id)}
-              >
-                {t.category_display}: {t.name}
-              </button>
-            ))}
-          </div>
+          <TagInput value={form.tags} onChange={(ids) => set("tags", ids)} />
           <button type="submit" disabled={busy}>
             {busy ? "Saving…" : "Create song"}
           </button>

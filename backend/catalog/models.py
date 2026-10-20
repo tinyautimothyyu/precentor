@@ -4,12 +4,14 @@ Core data model for the worship ministry catalog (MVP).
 Mirrors Section 4 of the requirements doc. Design decisions baked in here:
 - Relational core with JSONB (segments, line_pairing) for flexible nested data.
 - Licensing fields are mandatory on Song from day one, not retrofitted later.
-- Tags are a controlled vocabulary (Tag model with a category) rather than a
-  free-text array, so the taxonomy stays consistent as the library grows.
+- Tags are a curated vocabulary (Tag model with a category). Leaders may add
+  "custom" tags, matched case-insensitively against existing ones so near-
+  duplicates aren't created; staff tidy them up (merge/recategorise) in admin.
 - Translation status is an explicit workflow so drafts are never treated as
   service-ready without human verification.
 """
 from django.conf import settings
+from django.db.models.functions import Lower
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
@@ -108,13 +110,26 @@ class Tag(models.Model):
         SEASON = "season", "Season"
         LANGUAGE = "language", "Language"
         MOOD = "mood", "Mood"
+        CUSTOM = "custom", "Custom"
 
     category = models.CharField(max_length=20, choices=Category.choices)
     name = models.CharField(max_length=100)
+    created_by_team = models.ForeignKey(
+        "Team",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_tags",
+        help_text="Team that added this tag (custom tags). Null = admin.",
+    )
 
     class Meta:
         ordering = ["category", "name"]
-        unique_together = [("category", "name")]
+        constraints = [
+            models.UniqueConstraint(
+                Lower("name"), "category", name="tag_unique_name_per_category_ci"
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_category_display()}: {self.name}"

@@ -3,7 +3,8 @@ Django admin is the MVP data-entry UI. The goal is that a staff member can
 enter a real song end to end — metadata, licensing, tags, lyrics in one or
 more languages, and multiple sheet files — from a single song page.
 """
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.db import transaction
 from django.utils.html import format_html
 
 from .models import (
@@ -157,13 +158,36 @@ class TeamAdmin(admin.ModelAdmin):
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ("name", "category", "song_count")
-    list_filter = ("category",)
+    list_display = ("name", "category", "created_by_team", "song_count")
+    # Recategorise custom tags straight from the list.
+    list_editable = ("category",)
+    list_filter = ("category", "created_by_team")
     search_fields = ("name",)
+    actions = ["merge_tags"]
 
     @admin.display(description="Songs")
     def song_count(self, obj):
         return obj.songs.count()
+
+    @admin.action(description="Merge selected tags into one")
+    def merge_tags(self, request, queryset):
+        tags = list(queryset)
+        if len(tags) < 2:
+            self.message_user(request, "Select at least two tags to merge.", messages.WARNING)
+            return
+        # Keep a curated (non-custom) tag if there is one, else the oldest.
+        target = min(tags, key=lambda t: (t.category == Tag.Category.CUSTOM, t.id))
+        others = [t for t in tags if t.pk != target.pk]
+        with transaction.atomic():
+            for tag in others:
+                target.songs.add(*tag.songs.all())
+                tag.delete()
+        self.message_user(
+            request,
+            f"Merged {', '.join(t.name for t in others)} into “{target.name}” "
+            f"({target.get_category_display()}).",
+            messages.SUCCESS,
+        )
 
 
 # --- Lyrics & sheets (also editable standalone) --------------------------
