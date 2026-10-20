@@ -68,6 +68,16 @@ npm install
 npm run dev                        # http://localhost:3000
 ```
 
+**Viewing on a phone (dev):** serve the API through Next so one URL is enough,
+then tunnel port 3000. In `frontend/.env.local`:
+```bash
+NEXT_PUBLIC_API_BASE=                     # empty = same origin
+API_PROXY_TARGET=http://localhost:8000    # Next proxies /api/* to Django
+```
+Then `brew install cloudflared && cloudflared tunnel --url http://localhost:3000`
+and open the printed `https://….trycloudflare.com` link. The link is public —
+anyone who has it reaches your dev app — so stop the tunnel when done.
+
 ### Production
 `docker-compose.prod.yml` runs Postgres, Django (gunicorn), the built Next.js app and
 Caddy (automatic HTTPS) on a single domain. Point the domain's DNS at the server and
