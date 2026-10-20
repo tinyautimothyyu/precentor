@@ -20,7 +20,7 @@ import type {
 } from "@/lib/types";
 
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000"; // "" = same origin
 
 // --- token storage (localStorage; guarded for SSR) -----------------------
 
