@@ -14,6 +14,7 @@ from .models import (
     ServiceSong,
     SheetFile,
     Song,
+    SongFlow,
     SongLyrics,
     Tag,
     Team,
@@ -218,7 +219,7 @@ class SheetFileAdmin(admin.ModelAdmin):
 class ServiceSongInline(admin.TabularInline):
     model = ServiceSong
     extra = 0
-    fields = ("order", "song", "key_override", "format_override", "reference_url_override")
+    fields = ("order", "song", "key_override", "format_override", "reference_url_override", "flow")
     autocomplete_fields = ("song",)
     ordering = ("order",)
 
@@ -234,3 +235,11 @@ class ServiceAdmin(admin.ModelAdmin):
     @admin.display(description="Songs")
     def song_count(self, obj):
         return obj.items.count()
+
+
+@admin.register(SongFlow)
+class SongFlowAdmin(admin.ModelAdmin):
+    list_display = ("song", "owner_team", "name", "is_default", "updated_at")
+    list_filter = ("owner_team",)
+    search_fields = ("song__title", "name")
+    autocomplete_fields = ("song",)

@@ -278,7 +278,7 @@ export default function NewSongPage() {
             <input value={form.ccli_number} onChange={(e) => set("ccli_number", e.target.value)} required />
           </label>
           <LicensingHelp field="ccli" />
-          <SongSelectLink title={form.title} />
+          <SongSelectLink title={form.title} ccli={form.ccli_number} artist={lookup?.artist ?? ""} />
           <label>
             Copyright holder * <Badge field="copyright_holder" />
             <input value={form.copyright_holder} onChange={(e) => set("copyright_holder", e.target.value)} required />

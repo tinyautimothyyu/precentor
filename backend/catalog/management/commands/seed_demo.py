@@ -64,7 +64,9 @@ class Command(BaseCommand):
                 translation_source=SongLyrics.Source.OFFICIAL,
                 segments=[
                     {
-                        "segment_type": "verse1",
+                        "id": "V1",
+                        "type": "verse",
+                        "label": "Verse 1",
                         "lines": [
                             "Amazing grace, how sweet the sound",
                             "That saved a wretch like me",
@@ -94,7 +96,9 @@ class Command(BaseCommand):
                 translation_source=SongLyrics.Source.OFFICIAL,
                 segments=[
                     {
-                        "segment_type": "verse1",
+                        "id": "V1",
+                        "type": "verse",
+                        "label": "Verse 1",
                         "lines": [
                             "The Lord is my shepherd, I shall not want",
                             "He makes me lie down in green pastures",
@@ -109,7 +113,9 @@ class Command(BaseCommand):
                 translation_source=SongLyrics.Source.TEAM,
                 segments=[
                     {
-                        "segment_type": "verse1",
+                        "id": "V1",
+                        "type": "verse",
+                        "label": "Verse 1",
                         "lines": [
                             "耶和華是我的牧者，我必不至缺乏",
                             "他使我躺臥在青草地上",
@@ -122,8 +128,8 @@ class Command(BaseCommand):
                 primary_language="English",
                 secondary_language="Chinese",
                 line_pairing=[
-                    {"segment": "verse1", "en_line": 0, "zh_line": 0},
-                    {"segment": "verse1", "en_line": 1, "zh_line": 1},
+                    {"segment": "V1", "en_line": 0, "zh_line": 0},
+                    {"segment": "V1", "en_line": 1, "zh_line": 1},
                 ],
             )
 

@@ -23,9 +23,50 @@ export interface Tag {
   category_display: string;
 }
 
-export interface Segment {
-  segment_type: string;
+/** A lyric section, written once (see lib/lyrics.ts). */
+export interface Section {
+  /** V1, V2, PC, C, C2, B, ET, I, O */
+  id: string;
+  type: string;
+  label: string;
   lines: string[];
+}
+
+/** One step of a flow: a section, a marker, or a section borrowed from another song. */
+export type FlowStep =
+  | { section: string; song?: number }
+  | { marker: string; label: string };
+
+export interface SongFlow {
+  id: number;
+  song: number;
+  owner_team: number;
+  owner_team_name: string;
+  name: string;
+  steps: FlowStep[];
+  is_default: boolean;
+  updated_at: string;
+}
+
+export interface BorrowedSong {
+  id: number;
+  title: string;
+  ccli_number: string;
+  copyright_holder: string;
+}
+
+export type ArrangedItem =
+  | { kind: "section"; id: string; label: string; lines: string[]; song: BorrowedSong | null }
+  | { kind: "marker"; label: string }
+  | { kind: "missing"; id: string; song: BorrowedSong | null };
+
+/** Result of POST /api/songs/<id>/arrange/. */
+export interface Arrangement {
+  language: string | null;
+  languages: string[];
+  items: ArrangedItem[];
+  borrowed: BorrowedSong[];
+  flow: { id: number; name: string; owner_team_name: string } | null;
 }
 
 export interface Lyric {
@@ -33,7 +74,7 @@ export interface Lyric {
   song?: number;
   owner_team: number | null;
   language: string;
-  segments: Segment[];
+  segments: Section[];
   translation_source: string;
   status: string;
   status_display: string;
@@ -90,6 +131,7 @@ export interface SongDetail extends SongListItem {
   lyrics: Lyric[];
   sheets: SheetFile[];
   alignments: Alignment[];
+  flows: SongFlow[];
   created_at: string;
   updated_at: string;
 }
@@ -143,6 +185,8 @@ export interface ServiceSongItem {
   reference_url_override: string;
   /** Effective track: the override, else the song's reference_url. */
   reference_url: string;
+  /** Lyric flow for this service (null = the team's default). */
+  flow: number | null;
 }
 
 export interface ServiceSheet {

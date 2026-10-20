@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useState, type ReactNode } from "react";
 
 type Field = "ccli" | "copyright" | "notes";
 
@@ -46,15 +48,74 @@ export default function LicensingHelp({ field }: { field: Field }) {
   );
 }
 
-/** Opens SongSelect pre-searched with the title (new tab). */
-export function SongSelectLink({ title }: { title: string }) {
+const SONGSELECT = "https://songselect.ccli.com";
+// Chinese/Japanese/Korean characters — SongSelect's search doesn't match these.
+const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
+
+const searchUrl = (q: string) => `${SONGSELECT}/search/results?search=${encodeURIComponent(q)}`;
+
+/**
+ * SongSelect shortcut (new tab): opens the song directly when the CCLI number
+ * is known; otherwise searches by title. For Chinese titles, which SongSelect
+ * can't search, asks for the English title, artist or publisher instead.
+ */
+export function SongSelectLink({
+  title,
+  ccli = "",
+  artist = "",
+}: {
+  title: string;
+  ccli?: string;
+  artist?: string;
+}) {
+  const [alt, setAlt] = useState(artist);
+  useEffect(() => setAlt((a) => a || artist), [artist]);
   const q = title.trim();
-  const href = q
-    ? `https://songselect.ccli.com/search/results?search=${encodeURIComponent(q)}`
-    : "https://songselect.ccli.com/";
+  const number = ccli.trim();
+
+  if (/^\d+$/.test(number)) {
+    return (
+      <a href={`${SONGSELECT}/songs/${number}`} target="_blank" rel="noreferrer" className="songselect-link">
+        Open CCLI #{number} on SongSelect ↗
+      </a>
+    );
+  }
+  if (!q) {
+    return (
+      <a href={SONGSELECT} target="_blank" rel="noreferrer" className="songselect-link">
+        Open SongSelect ↗
+      </a>
+    );
+  }
+  if (!CJK.test(q)) {
+    return (
+      <a href={searchUrl(q)} target="_blank" rel="noreferrer" className="songselect-link">
+        Search SongSelect for &ldquo;{q}&rdquo; ↗
+      </a>
+    );
+  }
+  const altQ = alt.trim();
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="songselect-link">
-      {q ? `Search SongSelect for “${q}” ↗` : "Open SongSelect ↗"}
-    </a>
+    <div className="songselect-alt">
+      <p className="muted">
+        SongSelect can&apos;t search Chinese titles — it lists songs by their English
+        title. Search by the English title, artist or publisher instead:
+      </p>
+      <div className="songselect-alt-row">
+        <input
+          value={alt}
+          onChange={(e) => setAlt(e.target.value)}
+          placeholder="e.g. Stream of Praise, or the English title"
+          aria-label="SongSelect search"
+        />
+        {altQ ? (
+          <a href={searchUrl(altQ)} target="_blank" rel="noreferrer" className="songselect-link">
+            Search SongSelect ↗
+          </a>
+        ) : (
+          <span className="songselect-link muted">Search SongSelect ↗</span>
+        )}
+      </div>
+    </div>
   );
 }

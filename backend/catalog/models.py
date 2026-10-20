@@ -218,8 +218,8 @@ class SongLyrics(TimeStampedModel):
         default=list,
         blank=True,
         help_text=(
-            'List of segments, e.g. '
-            '[{"segment_type": "verse1", "lines": ["...", "..."]}]'
+            "Sections, each written once (see catalog/flows.py), e.g. "
+            '[{"id": "V1", "type": "verse", "label": "Verse 1", "lines": ["..."]}]'
         ),
     )
     translation_source = models.CharField(
@@ -272,6 +272,49 @@ class LyricAlignment(TimeStampedModel):
         return (
             f"{self.song.title}: {self.primary_language} ↔ {self.secondary_language}"
         )
+
+
+class SongFlow(TimeStampedModel):
+    """
+    A team's running order for a song, e.g. V1 C V2 C MB C ET. Steps reference
+    section ids, so the flow applies to every language. Any team may create
+    flows on any song; only the owning team edits its own flows.
+    """
+
+    song = models.ForeignKey(Song, on_delete=models.CASCADE, related_name="flows")
+    owner_team = models.ForeignKey(
+        "Team", on_delete=models.CASCADE, related_name="song_flows"
+    )
+    name = models.CharField(max_length=100, default="Standard")
+    steps = models.JSONField(default=list, blank=True)
+    is_default = models.BooleanField(
+        default=False, help_text="The team's default flow for this song."
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+
+    class Meta:
+        ordering = ["song__title", "owner_team__name", "-is_default", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["song", "owner_team", "name"], name="flow_unique_name_per_team"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.song.title} — {self.owner_team.name}: {self.name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_default:  # one default per team per song
+            SongFlow.objects.filter(song=self.song, owner_team=self.owner_team).exclude(
+                pk=self.pk
+            ).update(is_default=False)
 
 
 # --- Sheet files ---------------------------------------------------------
@@ -402,6 +445,14 @@ class ServiceSong(models.Model):
     reference_url_override = models.URLField(
         blank=True,
         help_text="Reference track for this service only; falls back to the song's.",
+    )
+    flow = models.ForeignKey(
+        SongFlow,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="service_items",
+        help_text="Lyric flow for this service; falls back to the team's default.",
     )
 
     class Meta:

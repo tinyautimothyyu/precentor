@@ -32,7 +32,7 @@ The build is organized into self-contained chunks. Each chunk produces a coheren
 | 8 | Custom tags | 🔀 On branch `feature/custom-tags` |
 | 9 | Link-first "Add song" with autofill | 🔀 On branch `feature/link-first-add-song` |
 | 10 | Sheet reuse | 🔀 On branch `feature/sheet-reuse` |
-| 11 | Structured lyrics & team flows | ⬜ Next up |
+| 11 | Structured lyrics & team flows | 🔀 On branch `feature/lyrics-flows` |
 
 Rough total for chunks 7–11: **3–5 weeks** for one developer.
 
@@ -223,6 +223,8 @@ Rendered:  Verse 1 · Chorus · Verse 2 · Chorus · [Music break] · Chorus · 
 **Licensing:** a remixed section shows the borrowed song's CCLI number and copyright alongside, so usage reporting covers both songs.
 
 **Done when:** a team can enter a song's sections once, type `V C MB V C ET`, and see the full lyrics in that order — including a section borrowed from another song — and pick that flow for a service.
+
+**As built:** shorthand also accepts `@<songId>:<section>` for remix steps (inserted by the "Section from another song" picker). Pasting lyrics whose order repeats sections offers to save that order as the team's default flow in the same step. Expansion lives server-side (`POST /api/songs/<id>/arrange/`) so v3 slide generation can reuse it.
 
 ---
 
