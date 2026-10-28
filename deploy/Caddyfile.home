@@ -1,0 +1,31 @@
+# Home-server variant of the Caddyfile (see docs/home-server.md).
+#
+# Tailscale Funnel terminates HTTPS and forwards plain HTTP here, so Caddy
+# listens on :80 without requesting a certificate. Every public request
+# arrived over HTTPS, so tell Django so (otherwise SECURE_SSL_REDIRECT loops),
+# and pin the Host header to DOMAIN so ALLOWED_HOSTS and CSRF checks match
+# whatever Host the tunnel sends.
+:80 {
+	encode zstd gzip
+
+	# Django admin static assets (collected into the shared volume).
+	handle_path /static/* {
+		root * /srv/static
+		file_server
+	}
+
+	@django path /api/* /admin /admin/* /healthz
+	handle @django {
+		reverse_proxy web:8000 {
+			header_up Host {$DOMAIN}
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	handle {
+		reverse_proxy frontend:3000 {
+			header_up Host {$DOMAIN}
+			header_up X-Forwarded-Proto https
+		}
+	}
+}
