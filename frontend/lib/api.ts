@@ -182,6 +182,9 @@ export function createTag(name: string): Promise<Tag> {
 export function fetchCongregations(): Promise<Paginated<Congregation>> {
   return request<Paginated<Congregation>>(`/api/congregations/`);
 }
+export function fetchCongregation(id: string | number): Promise<Congregation> {
+  return request<Congregation>(`/api/congregations/${id}/`);
+}
 export function fetchConfig(): Promise<AppConfig> {
   return request<AppConfig>(`/api/config/`);
 }

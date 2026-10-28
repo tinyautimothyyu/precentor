@@ -107,6 +107,24 @@ class ServiceSongApiTests(APITestCase):
         res = self.client.patch(self._url(item_a), {"key_override": "A"}, format="json")
         self.assertEqual(res.status_code, 403)
 
+    def test_service_congregation_follows_team_and_is_read_only(self):
+        other = Congregation.objects.create(name="Other", primary_language="en")
+        self.client.force_authenticate(self.leader_a)
+        res = self.client.post(
+            "/api/services/",
+            {"date": "2026-11-01", "congregation": other.id},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 201)
+        service = Service.objects.get(pk=res.json()["id"])
+        self.assertEqual(service.congregation_id, self.team_a.congregation_id)
+        res = self.client.patch(
+            f"/api/services/{service.id}/", {"congregation": other.id}, format="json"
+        )
+        self.assertEqual(res.status_code, 200)
+        service.refresh_from_db()
+        self.assertEqual(service.congregation_id, self.team_a.congregation_id)
+
     def test_service_detail_includes_sheets_and_effective_url(self):
         self.client.force_authenticate(self.vol)
         data = self.client.get(f"/api/services/{self.service_b.id}/").json()

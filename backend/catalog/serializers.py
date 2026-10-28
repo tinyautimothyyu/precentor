@@ -472,4 +472,5 @@ class ServiceWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
         fields = ["id", "date", "title", "notes", "congregation", "team"]
-        read_only_fields = ["team"]
+        # Both come from the creator's team; a service can't change hands.
+        read_only_fields = ["team", "congregation"]
