@@ -31,6 +31,8 @@ admin approves them and sets role + congregation/team in Django admin (Accounts 
 Memberships → "Approve selected"). Content carries an `owner_team`; a leader from
 another team can still contribute a new translation/sheet (owned by *their* team)
 without editing the original — matching the multi-team/bilingual design.
+Step-by-step admin tasks (first-time setup, approvals, tags, backups):
+[docs/admin-guide.md](docs/admin-guide.md).
 
 ### MVP decisions (Chunk 0)
 - **Tags** are a controlled vocabulary — a `Tag` model with a `category`

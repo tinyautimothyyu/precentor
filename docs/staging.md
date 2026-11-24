@@ -132,20 +132,17 @@ Create your admin account:
 dc exec web python manage.py createsuperuser
 ```
 
-Then, in **https://staging.example.org/admin/**:
+Then, in **https://staging.example.org/admin/**, follow the
+[admin guide's first-time setup](admin-guide.md#first-time-setup-once-right-after-the-first-deploy):
+create a **Congregation** and its **Teams**, then give your superuser a **team** (it
+can't create services without one). The admin guide also covers approving testers
+and day-to-day admin work.
 
-1. Create a **Congregation** and at least one **Team** in it.
-2. Open **Memberships**, find your superuser, and set its **team**. A superuser is
-   automatically an approved leader, but **can't create services without a team**.
-
-Optionally load demo songs instead of entering them by hand:
+On staging only, you can load demo songs instead of entering them by hand:
 
 ```bash
 dc exec web python manage.py seed_demo
 ```
-
-Testers sign up at `/signup`. Their accounts start **pending**; approve them (and set
-role and team) under **Memberships** in the admin.
 
 ## 8. Deploying updates
 

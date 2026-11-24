@@ -9,6 +9,11 @@ name: Build and publish images
 on:
   push:
     branches: [main]
+    # Docs-only pushes don't rebuild or redeploy. A push that also touches code
+    # still runs. To deploy anyway, use "Run workflow" (workflow_dispatch).
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   workflow_dispatch:
 
 permissions:
