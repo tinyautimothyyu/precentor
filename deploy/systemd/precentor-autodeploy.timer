@@ -1,0 +1,10 @@
+# Installed to /etc/systemd/system/ (see docs/aws-deploy.md).
+[Unit]
+Description=Check ECR for new Precentor images every 2 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+
+[Install]
+WantedBy=timers.target
