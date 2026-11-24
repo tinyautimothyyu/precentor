@@ -187,6 +187,16 @@ ssh -i ~/.ssh/precentor.pem ubuntu@<elastic-ip>
 Follow [staging.md](staging.md) steps 3–5 (deploy user, Docker, deploy key and clone,
 `.env.prod`), with these differences:
 
+- **You log in as `ubuntu`, not `root`.** EC2 disables root login, so create the deploy
+  user from the `ubuntu` account with `sudo`, then log in as `deploy` from then on:
+
+  ```bash
+  sudo adduser deploy
+  sudo usermod -aG sudo deploy
+  sudo rsync --archive --chown=deploy:deploy ~/.ssh /home/deploy   # same key works for deploy
+  curl -fsSL https://get.docker.com | sudo sh
+  sudo usermod -aG docker deploy
+  ```
 - **Skip `ufw`.** On EC2 the security group is the firewall, and ports Docker publishes
   bypass `ufw` anyway.
 - In `.env.prod`, set `DOMAIN` to the hostname from step 5 (the same value as
