@@ -132,13 +132,11 @@ dc exec web python manage.py createsuperuser
 dc exec web python manage.py seed_demo        # optional demo songs
 ```
 
-Then in `https://<your DOMAIN>/admin/`:
-
-1. Create a **Congregation** and at least one **Team**.
-2. Under **Memberships**, give your superuser a **team**. A superuser is an approved
-   leader automatically but **can't create services without a team**.
-3. Testers sign up at `/signup`; approve them (and set role and team) under
-   **Memberships**.
+Then in `https://<your DOMAIN>/admin/`, follow the
+[admin guide's first-time setup](admin-guide.md#first-time-setup-once-right-after-the-first-deploy):
+create a **Congregation** and its **Teams**, then give your superuser a **team** (it
+can't create services without one). Testers sign up at `/signup`; the admin guide
+covers approving them and day-to-day admin work.
 
 ## 9. Day-to-day
 

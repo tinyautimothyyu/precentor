@@ -350,9 +350,15 @@ dc ps          # four services: db, web, frontend, caddy
 dc exec web python manage.py createsuperuser
 ```
 
-Then in `https://<domain>/admin/`, create a **Congregation** and a **Team**, and under
-**Memberships** set your superuser's **team**. Without a team, you can't create
-services. Finally, set up the nightly backups in [staging.md](staging.md) step 9.
+Then follow the
+[admin guide's first-time setup](admin-guide.md#first-time-setup-once-right-after-the-first-deploy):
+create a **Congregation** and its **Teams** before inviting anyone, and give your
+superuser a **team** (without one, you can't create services). Don't run `seed_demo`
+here; it's for test servers. Finally, set up the nightly backups in
+[staging.md](staging.md) step 9.
+
+For approving signups, roles, tags and other routine admin work, see
+[admin-guide.md](admin-guide.md).
 
 ## Day to day
 
