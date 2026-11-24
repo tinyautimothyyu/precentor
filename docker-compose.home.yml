@@ -1,0 +1,17 @@
+# Home-server override for docker-compose.prod.yml (see docs/home-server.md).
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.home.yml \
+#     --env-file .env.prod up -d --build
+#
+# Caddy serves plain HTTP on localhost:8080 only; Tailscale Funnel (or another
+# HTTPS tunnel) is the public entry point. Nothing is reachable from the LAN.
+
+services:
+  caddy:
+    ports: !override
+      - "127.0.0.1:8080:80"
+    volumes: !override
+      - ./deploy/Caddyfile.home:/etc/caddy/Caddyfile:ro
+      - static:/srv/static:ro
+      - caddy_data:/data
+      - caddy_config:/config

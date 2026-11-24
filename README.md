@@ -90,6 +90,9 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod exec web \
 ```
 Changing `DOMAIN` requires `--build` (the API URL is baked into the frontend bundle).
 
+For a test server: [docs/staging.md](docs/staging.md) (paid VPS) or
+[docs/home-server.md](docs/home-server.md) (free, on a Windows PC via Tailscale Funnel).
+
 ## API
 
 | Endpoint | Auth | Purpose |

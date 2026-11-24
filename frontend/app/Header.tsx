@@ -16,6 +16,9 @@ export default function Header() {
         <nav className="header-nav">
           {loading ? null : user ? (
             <>
+              <Link href="/congregations" className="header-link">
+                Congregations
+              </Link>
               {isApproved && (
                 <Link href="/services" className="header-link">
                   Services
