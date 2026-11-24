@@ -1,0 +1,16 @@
+# AWS (EC2 + ECR) override for docker-compose.prod.yml (see docs/aws-deploy.md).
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.ecr.yml \
+#     --env-file .env.prod up -d
+#
+# The server runs images that GitHub Actions built and pushed to ECR instead of
+# building them itself. deploy/autodeploy.sh pulls new ones and restarts.
+
+services:
+  web:
+    build: !reset null
+    image: ${REGISTRY:?set REGISTRY in .env.prod}/precentor-web:main
+
+  frontend:
+    build: !reset null
+    image: ${REGISTRY:?set REGISTRY in .env.prod}/precentor-frontend:main

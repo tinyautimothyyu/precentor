@@ -92,6 +92,8 @@ Changing `DOMAIN` requires `--build` (the API URL is baked into the frontend bun
 
 For a test server: [docs/staging.md](docs/staging.md) (paid VPS) or
 [docs/home-server.md](docs/home-server.md) (free, on a Windows PC via Tailscale Funnel).
+For automatic deploys on every merge to `main` (GitHub Actions → ECR → EC2):
+[docs/aws-deploy.md](docs/aws-deploy.md).
 
 ## API
 

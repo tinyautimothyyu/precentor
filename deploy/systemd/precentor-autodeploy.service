@@ -1,0 +1,11 @@
+# Installed to /etc/systemd/system/ (see docs/aws-deploy.md).
+[Unit]
+Description=Pull new Precentor images from ECR and redeploy
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+Environment=APP_DIR=/home/deploy/precentor
+ExecStart=/usr/local/bin/precentor-autodeploy

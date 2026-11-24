@@ -1,0 +1,102 @@
+# Builds the web (Django) and frontend (Next.js) images on every push to main and
+# publishes them to Amazon ECR. The EC2 server polls ECR for the :main tag and
+# redeploys itself (deploy/autodeploy.sh); this workflow never connects to it.
+#
+# Setup (AWS resources and the repository variables below): docs/aws-deploy.md.
+
+name: Build and publish images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # OIDC token, exchanged for short-lived AWS credentials
+  contents: read
+
+# One release at a time. Queued runs wait instead of cancelling a run halfway
+# through retagging, so :main never points at a mismatched web/frontend pair.
+concurrency:
+  group: publish-images
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+  PROD_DOMAIN: ${{ vars.PROD_DOMAIN }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { name: web, context: backend }
+          - { name: frontend, context: frontend }
+    steps:
+      - name: Check repository variables
+        run: |
+          missing=0
+          for v in AWS_REGION AWS_DEPLOY_ROLE_ARN PROD_DOMAIN; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Repository variable $v is not set (Settings → Secrets and variables → Actions → Variables). See docs/aws-deploy.md."
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Pushed under the commit SHA only; the release job moves :main once both
+      # images exist.
+      - uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/precentor-${{ matrix.name }}:${{ github.sha }}
+          # The server reads this label to check out the matching compose file and Caddyfile.
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          # Baked into the client bundle at build time (only the frontend uses it).
+          build-args: NEXT_PUBLIC_API_BASE=https://${{ env.PROD_DOMAIN }}
+          # One plain image per build: no attestation manifests cluttering ECR.
+          provenance: false
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  release:
+    name: Tag :main
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Point :main at this commit
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          for n in web frontend; do
+            docker buildx imagetools create \
+              --tag "$REGISTRY/precentor-$n:main" \
+              "$REGISTRY/precentor-$n:$GITHUB_SHA"
+          done
+          echo "Released $GITHUB_SHA. The server picks it up within about 2 minutes." >> "$GITHUB_STEP_SUMMARY"
